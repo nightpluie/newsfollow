@@ -8,6 +8,14 @@ from __future__ import annotations
 
 import os
 from typing import List, Dict, Optional
+
+# 載入環境變數
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # 從 .env 檔案載入環境變數
+except ImportError:
+    print("⚠️  未安裝 python-dotenv，請執行: pip install python-dotenv")
+
 from openai import OpenAI
 from main import title_similarity
 
@@ -27,16 +35,18 @@ class HybridSimilarityChecker:
        - 簡單 prompt：判斷是否為同一事件
     """
 
-    def __init__(self, api_key: Optional[str] = None, enable_llm: bool = True):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini", enable_llm: bool = True):
         """
         初始化混合檢查器
 
         Args:
             api_key: OpenAI API Key（如未提供則從環境變數讀取）
+            model: OpenAI 模型名稱（預設 gpt-4o-mini）
             enable_llm: 是否啟用 LLM（False 則只用演算法）
         """
         self.enable_llm = enable_llm
         self.client = None
+        self.model = model
         self.llm_call_count = 0  # 統計 LLM 調用次數
 
         if enable_llm:
@@ -46,7 +56,7 @@ class HybridSimilarityChecker:
                 self.enable_llm = False
             else:
                 self.client = OpenAI(api_key=api_key)
-                print("✅ 混合相似度檢查器已啟用 LLM 功能（GPT-4o-mini）")
+                print(f"✅ 混合相似度檢查器已啟用 LLM 功能（{model}）")
 
     def is_same_news(self, title1: str, title2: str) -> bool:
         """
@@ -103,7 +113,7 @@ class HybridSimilarityChecker:
 只回答 yes 或 no，不要有其他文字。"""
 
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",  # 最便宜的模型
+                model=self.model,  # 使用配置的模型
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=5,
                 temperature=0

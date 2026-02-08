@@ -1,23 +1,27 @@
+# API Keys - 絕不提交到 Git
+.env
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-venv/
 .venv/
-ENV/
+venv/
 env/
+ENV/
 
-# Environment variables
-.env
-.env.local
+# Database
+*.db
+*.sqlite3
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
@@ -25,7 +29,7 @@ Thumbs.db
 
 # Logs
 *.log
+/tmp/
 
-# Database (contains user data)
-*.db
-
+# 其他敏感文件
+config.local.yaml

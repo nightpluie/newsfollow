@@ -11,6 +11,13 @@ import os
 from dataclasses import dataclass
 from typing import Dict, List
 
+# 載入環境變數
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # 從 .env 檔案載入環境變數
+except ImportError:
+    print("⚠️  未安裝 python-dotenv，請執行: pip install python-dotenv")
+
 import anthropic
 import requests
 import yaml
@@ -33,8 +40,10 @@ from hybrid_similarity import HybridSimilarityChecker
 app = Flask(__name__)
 CORS(app)
 
-# Claude API 設定 (從環境變數讀取)
+# API Keys 從環境變數讀取
 CLAUDE_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # 預設使用 gpt-4o-mini
 
 # 載入寫作技能 (可選)
 SKILL_PATH = os.getenv("SKILL_PATH", "./SKILL.md")
@@ -56,6 +65,8 @@ class NewsItem:
     url: str
     normalized_title: str
     crawled_at: str
+    section: str = 'homepage'
+    weight: int = 5
 
 
 class NewsDashboard:
@@ -69,8 +80,11 @@ class NewsDashboard:
         self.claude = anthropic.Anthropic(api_key=CLAUDE_API_KEY) if CLAUDE_API_KEY else None
 
         # 初始化混合相似度檢查器（演算法 + LLM）
-        self.similarity_checker = HybridSimilarityChecker(enable_llm=True)
-        print("✅ 混合相似度檢查器已啟用（演算法 + GPT-4o-mini）")
+        self.similarity_checker = HybridSimilarityChecker(
+            api_key=OPENAI_API_KEY,
+            model=OPENAI_MODEL,
+            enable_llm=True
+        )
 
     def crawl_source(self, source_config: Dict) -> List[NewsItem]:
         """爬取單一媒體來源"""
@@ -99,6 +113,8 @@ class NewsDashboard:
                         url=sig.url,
                         normalized_title=sig.normalized_title,
                         crawled_at=sig.crawled_at,
+                        section=sig.section_id,
+                        weight=sig.weight,
                     ))
 
             except Exception as e:
@@ -158,44 +174,113 @@ class NewsDashboard:
 
         return unique_items
 
-    def find_missing_news(self, udn_items: List[NewsItem], tvbs_items: List[NewsItem],
+    def find_missing_news(self, all_source_items: Dict[str, List[NewsItem]],
                          ettoday_items: List[NewsItem]) -> List[Dict]:
         """
         找出 ETtoday 沒有的新聞
         使用混合策略（演算法 + LLM）進行相似度比對
+        並將相同新聞分群顯示
         """
+        from main import title_similarity
+        from news_importance import calculate_news_importance, format_star_rating
+
         # 收集 ETtoday 所有標題（用於混合比對）
         ettoday_titles_list = [item.title for item in ettoday_items]
-        all_items = udn_items + tvbs_items
 
-        # 重置統計資訊
+        # 收集所有不在 ETtoday 的新聞（使用混合相似度比對）
         self.similarity_checker.reset_statistics()
+        missing_items = []
 
-        missing = []
-        for item in all_items:
-            # 使用混合策略檢查是否在 ETtoday 中存在
-            is_in_ettoday = self.similarity_checker.batch_check(
-                candidate_title=item.title,
-                reference_titles=ettoday_titles_list
-            )
+        for source_name, items in all_source_items.items():
+            for item in items:
+                # 使用混合策略檢查是否在 ETtoday 中存在
+                is_in_ettoday = self.similarity_checker.batch_check(
+                    candidate_title=item.title,
+                    reference_titles=ettoday_titles_list
+                )
 
-            # 只有當確定不在 ETtoday 時，才加入缺少列表
-            if not is_in_ettoday:
-                # 避免重複（檢查是否已在 missing 列表中）
-                if not any(m['normalized_title'] == item.normalized_title for m in missing):
-                    missing.append({
-                        'source': item.source,
-                        'title': item.title,
-                        'url': item.url,
-                        'normalized_title': item.normalized_title,
-                        'crawled_at': item.crawled_at,
-                    })
+                # 只有當確定不在 ETtoday 時，才加入缺少列表
+                if not is_in_ettoday:
+                    missing_items.append(item)
 
         # 顯示統計資訊
         stats = self.similarity_checker.get_statistics()
         print(f"📊 相似度比對統計: LLM 調用次數 = {stats['llm_call_count']}")
 
-        return missing
+        # 使用改進的相似度演算法進行群集（傳遞性群集）
+        clusters = []
+        for item in missing_items:
+            title = item.title
+            placed = False
+
+            # 檢查是否與現有群集中的任何新聞相似
+            for i, cluster in enumerate(clusters):
+                # 與群集中的每個項目比較
+                for existing_item in cluster:
+                    # 使用 0.47 閾值（比 0.5 稍低，因為這是最終顯示用）
+                    if title_similarity(title, existing_item.title) >= 0.47:
+                        clusters[i].append(item)
+                        placed = True
+                        break
+                if placed:
+                    break
+
+            if not placed:
+                clusters.append([item])
+
+        # 為每個群集建立新聞資訊
+        news_by_cluster = []
+        for cluster in clusters:
+            # 選擇最長的標題作為代表標題
+            canonical_title = max((item.title for item in cluster), key=len)
+            canonical_url = cluster[0].url
+
+            # 收集所有來源的詳細資訊（使用字典去重）
+            sources = []
+            source_details_dict = {}
+            sections_info = []
+
+            for item in cluster:
+                sources.append(item.source)
+
+                # 如果該來源還沒記錄，或新標題更長，則更新
+                if item.source not in source_details_dict or len(item.title) > len(source_details_dict[item.source]['title']):
+                    source_details_dict[item.source] = {
+                        'source': item.source,
+                        'title': item.title,
+                        'url': item.url,
+                    }
+
+                sections_info.append({
+                    'source': item.source,
+                    'section': getattr(item, 'section', 'homepage'),
+                    'weight': getattr(item, 'weight', 5),
+                })
+
+            # 將字典轉為列表（每個來源只保留一則）
+            source_details = list(source_details_dict.values())
+
+            # 計算重要性評分
+            importance = calculate_news_importance(canonical_title, sources, sections_info)
+            star_rating = format_star_rating(importance['star_rating'])
+
+            news_by_cluster.append({
+                'title': canonical_title,
+                'url': canonical_url,
+                'normalized_title': cluster[0].normalized_title,
+                'crawled_at': cluster[0].crawled_at,
+                'sources': sources,  # 簡單的來源名稱列表（用於評分）
+                'source_details': source_details,  # 詳細的來源資訊（用於前端顯示，已去重）
+                'sections_info': sections_info,
+                'importance': importance,
+                'star_rating': star_rating,
+                'total_score': importance['total_score'],
+            })
+
+        # 按重要性評分排序（高分在前）
+        news_by_cluster.sort(key=lambda x: x['total_score'], reverse=True)
+
+        return news_by_cluster
 
     def rewrite_with_claude(self, original_title: str, original_url: str) -> Dict:
         """使用 Claude API 改寫新聞 (使用唐鎮宇技能指引)"""
@@ -314,20 +399,38 @@ def index():
 def api_crawl():
     """爬取所有來源"""
     try:
+        # 爬取所有來源
         udn_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'udn'), None)
         udn_items = dashboard.crawl_source(udn_config) if udn_config else []
 
         tvbs_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'tvbs'), None)
         tvbs_items = dashboard.crawl_source(tvbs_config) if tvbs_config else []
 
+        chinatimes_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'chinatimes'), None)
+        chinatimes_items = dashboard.crawl_source(chinatimes_config) if chinatimes_config else []
+
+        setn_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'setn'), None)
+        setn_items = dashboard.crawl_source(setn_config) if setn_config else []
+
         ettoday_items = dashboard.crawl_ettoday()
 
-        missing_news = dashboard.find_missing_news(udn_items, tvbs_items, ettoday_items)
+        # 組合所有來源的字典
+        all_source_items = {
+            'UDN': udn_items,
+            'TVBS': tvbs_items,
+            '中時新聞網': chinatimes_items,
+            '三立新聞網': setn_items,
+        }
+
+        # 找出 ETtoday 缺少的新聞（使用混合相似度策略）
+        missing_news = dashboard.find_missing_news(all_source_items, ettoday_items)
 
         return jsonify({
             'success': True,
             'udn': [{'source': i.source, 'title': i.title, 'url': i.url} for i in udn_items],
             'tvbs': [{'source': i.source, 'title': i.title, 'url': i.url} for i in tvbs_items],
+            '中時新聞網': [{'source': i.source, 'title': i.title, 'url': i.url} for i in chinatimes_items],
+            '三立新聞網': [{'source': i.source, 'title': i.title, 'url': i.url} for i in setn_items],
             'ettoday': [{'source': i.source, 'title': i.title, 'url': i.url} for i in ettoday_items],
             'missing': missing_news,
         })
