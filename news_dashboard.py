@@ -10,6 +10,7 @@ import json
 import os
 from dataclasses import dataclass
 from typing import Dict, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 載入環境變數
 try:
@@ -128,7 +129,8 @@ class NewsDashboard:
 
         urls = [
             "https://www.ettoday.net/news/news-list.htm",
-            "https://www.ettoday.net/news/focus/focus-list.htm",
+            "https://www.ettoday.net/news/focus/焦點新聞/",
+            "https://www.ettoday.net/news/hot-news.htm",
         ]
 
         for url in urls:
@@ -397,22 +399,51 @@ def index():
 
 @app.route('/api/crawl', methods=['POST'])
 def api_crawl():
-    """爬取所有來源"""
+    """爬取所有來源（平行執行）"""
     try:
-        # 爬取所有來源
-        udn_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'udn'), None)
-        udn_items = dashboard.crawl_source(udn_config) if udn_config else []
+        # 定義爬取任務
+        def crawl_udn():
+            config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'udn'), None)
+            return ('UDN', dashboard.crawl_source(config) if config else [])
 
-        tvbs_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'tvbs'), None)
-        tvbs_items = dashboard.crawl_source(tvbs_config) if tvbs_config else []
+        def crawl_tvbs():
+            config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'tvbs'), None)
+            return ('TVBS', dashboard.crawl_source(config) if config else [])
 
-        chinatimes_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'chinatimes'), None)
-        chinatimes_items = dashboard.crawl_source(chinatimes_config) if chinatimes_config else []
+        def crawl_chinatimes():
+            config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'chinatimes'), None)
+            return ('中時新聞網', dashboard.crawl_source(config) if config else [])
 
-        setn_config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'setn'), None)
-        setn_items = dashboard.crawl_source(setn_config) if setn_config else []
+        def crawl_setn():
+            config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'setn'), None)
+            return ('三立新聞網', dashboard.crawl_source(config) if config else [])
 
-        ettoday_items = dashboard.crawl_ettoday()
+        def crawl_et():
+            return ('ETtoday', dashboard.crawl_ettoday())
+
+        # 平行爬取所有來源（最多 5 個同時執行）
+        results = {}
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            # 提交所有任務
+            futures = [
+                executor.submit(crawl_udn),
+                executor.submit(crawl_tvbs),
+                executor.submit(crawl_chinatimes),
+                executor.submit(crawl_setn),
+                executor.submit(crawl_et),
+            ]
+
+            # 收集結果
+            for future in as_completed(futures):
+                source_name, items = future.result()
+                results[source_name] = items
+
+        # 提取結果
+        udn_items = results.get('UDN', [])
+        tvbs_items = results.get('TVBS', [])
+        chinatimes_items = results.get('中時新聞網', [])
+        setn_items = results.get('三立新聞網', [])
+        ettoday_items = results.get('ETtoday', [])
 
         # 組合所有來源的字典
         all_source_items = {
@@ -425,6 +456,9 @@ def api_crawl():
         # 找出 ETtoday 缺少的新聞（使用混合相似度策略）
         missing_news = dashboard.find_missing_news(all_source_items, ettoday_items)
 
+        # 取得 LLM 調用次數統計
+        llm_calls = dashboard.similarity_checker.llm_call_count
+
         return jsonify({
             'success': True,
             'udn': [{'source': i.source, 'title': i.title, 'url': i.url} for i in udn_items],
@@ -433,6 +467,7 @@ def api_crawl():
             '三立新聞網': [{'source': i.source, 'title': i.title, 'url': i.url} for i in setn_items],
             'ettoday': [{'source': i.source, 'title': i.title, 'url': i.url} for i in ettoday_items],
             'missing': missing_news,
+            'llm_calls': llm_calls,
         })
 
     except Exception as e:

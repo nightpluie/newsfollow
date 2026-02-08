@@ -30,26 +30,26 @@ sources:
       - section_id: homepage
         url: https://udn.com/news/index
         weight: 5
-        max_items: 20
+        max_items: 30
         selectors:
           - "a.story-list__title-link"
           - ".story-list a"
           - "main a[href*='/news/story/']"
-      - section_id: marquee
+      - section_id: breaknews
         url: https://udn.com/news/index
         weight: 6
-        max_items: 12
+        max_items: 30
         selectors:
           - ".breaking-news a"
           - ".news-bar a"
-          - ".newsList a[href*='/news/story/']"
-      - section_id: hot
-        url: https://udn.com/rank/pv
-        weight: 4
-        max_items: 20
+          - "a[href*='breaknews']"
+      - section_id: realtime
+        url: https://udn.com/news/breaknews/1
+        weight: 6
+        max_items: 30
         selectors:
-          - ".ranking-list a"
-          - "table a[href*='/news/story/']"
+          - "a.story-list__title-link"
+          - ".story-list a"
           - "main a[href*='/news/story/']"
 
   - source_id: tvbs
@@ -59,7 +59,7 @@ sources:
       - section_id: homepage
         url: https://news.tvbs.com.tw/
         weight: 5
-        max_items: 20
+        max_items: 30
         selectors:
           - "a.news__title"
           - "a[href*='news.tvbs.com.tw/'][title]"
@@ -67,7 +67,7 @@ sources:
       - section_id: marquee
         url: https://news.tvbs.com.tw/
         weight: 6
-        max_items: 12
+        max_items: 30
         selectors:
           - ".breakingNews a"
           - ".marquee a"
@@ -75,8 +75,48 @@ sources:
       - section_id: hot
         url: https://news.tvbs.com.tw/hot
         weight: 4
-        max_items: 20
+        max_items: 30
         selectors:
           - ".hot a"
           - ".popular a"
           - "main a[href*='news.tvbs.com.tw/']"
+
+  - source_id: chinatimes
+    source_name: 中時新聞網
+    domain_contains: chinatimes.com
+    sections:
+      - section_id: realtime
+        url: https://www.chinatimes.com/realtimenews/?chdtv
+        weight: 6
+        max_items: 30
+        selectors:
+          - "h3 a"
+          - ".title a"
+      - section_id: homepage_breaking
+        url: https://www.chinatimes.com/
+        weight: 5
+        max_items: 30
+        selectors:
+          - "h3 a"
+          - ".title a"
+          - "a[href*='realtime']"
+
+  - source_id: setn
+    source_name: 三立新聞網
+    domain_contains: setn.com
+    sections:
+      - section_id: viewall
+        url: https://www.setn.com/ViewAll.aspx
+        weight: 6
+        max_items: 30
+        selectors:
+          - "h3 a"
+          - "a[href*='News.aspx?NewsID=']"
+      - section_id: homepage
+        url: https://www.setn.com/
+        weight: 5
+        max_items: 30
+        selectors:
+          - "a.gt"
+          - "h3 a"
+          - "a[href*='News.aspx?NewsID=']"
