@@ -11,11 +11,12 @@ import os
 from dataclasses import dataclass
 from typing import Dict, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from cache_manager import NewsCache
 
 # 載入環境變數
 try:
     from dotenv import load_dotenv
-    load_dotenv()  # 從 .env 檔案載入環境變數
+    load_dotenv(override=True)  # 從 .env 檔案載入環境變數（覆蓋 shell 環境變數）
 except ImportError:
     print("⚠️  未安裝 python-dotenv，請執行: pip install python-dotenv")
 
@@ -87,6 +88,10 @@ class NewsDashboard:
             enable_llm=True
         )
 
+        # 初始化快取管理器（ETtoday 快取 5 分鐘）
+        self.cache = NewsCache(cache_dir="./cache", ttl_minutes=5)
+        print("✅ 快取系統已啟用（TTL: 5 分鐘）")
+
     def crawl_source(self, source_config: Dict) -> List[NewsItem]:
         """爬取單一媒體來源"""
         items = []
@@ -124,7 +129,16 @@ class NewsDashboard:
         return items
 
     def crawl_ettoday(self) -> List[NewsItem]:
-        """爬取 ETtoday 新聞"""
+        """爬取 ETtoday 新聞（帶快取）"""
+        # 檢查快取
+        cached_data = self.cache.get('ettoday')
+        if cached_data:
+            cache_info = self.cache.get_info('ettoday')
+            print(f"✅ 使用 ETtoday 快取（{cache_info['age_seconds']:.0f}秒前）")
+            # 將字典轉回 NewsItem 物件
+            return [NewsItem(**item) for item in cached_data]
+
+        print("🔄 爬取 ETtoday 新聞（快取過期或不存在）...")
         items = []
 
         urls = [
@@ -173,6 +187,22 @@ class NewsDashboard:
             if key not in seen:
                 seen.add(key)
                 unique_items.append(item)
+
+        # 儲存到快取（轉為字典格式）
+        cache_data = [
+            {
+                'source': item.source,
+                'title': item.title,
+                'url': item.url,
+                'normalized_title': item.normalized_title,
+                'crawled_at': item.crawled_at,
+                'section': item.section,
+                'weight': item.weight,
+            }
+            for item in unique_items
+        ]
+        self.cache.set('ettoday', cache_data)
+        print(f"💾 已快取 ETtoday 新聞（{len(cache_data)} 則）")
 
         return unique_items
 
@@ -284,6 +314,19 @@ class NewsDashboard:
 
         return news_by_cluster
 
+    def clean_markdown(self, text: str) -> str:
+        """移除 Markdown 格式標記"""
+        import re
+        # 移除粗體 **text** 或 __text__
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        text = re.sub(r'__(.+?)__', r'\1', text)
+        # 移除斜體 *text* 或 _text_
+        text = re.sub(r'\*(.+?)\*', r'\1', text)
+        text = re.sub(r'_(.+?)_', r'\1', text)
+        # 移除標題標記 #
+        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+        return text
+
     def rewrite_with_claude(self, original_title: str, original_url: str) -> Dict:
         """使用 Claude API 改寫新聞 (使用唐鎮宇技能指引)"""
         try:
@@ -302,12 +345,18 @@ class NewsDashboard:
 {TCY_SKILL}
 
 重要提醒:
-1. **嚴格依據素材撰寫** - 只能根據提供的素材,禁止自行揣想或編造
-2. **倒金字塔結構** - 最重要資訊在前,依重要性遞減
-3. **金字塔原理** - 每段首句是核心論點,後續內容支撐該論點
-4. **導言涵蓋 5W1H** - 何時、何地、何人、何事、為何、如何
-5. **數據先行** - 用具體數字、統計資料開場
-6. **250字導言** - 精煉核心重點,不超過250字
+1. 嚴格依據素材撰寫 - 只能根據提供的素材,禁止自行揣想或編造
+2. 倒金字塔結構 - 最重要資訊在前,依重要性遞減
+3. 金字塔原理 - 每段首句是核心論點,後續內容支撐該論點
+4. 導言涵蓋 5W1H - 何時、何地、何人、何事、為何、如何
+5. 數據先行 - 用具體數字、統計資料開場
+6. 250字導言 - 精煉核心重點,不超過250字
+
+【格式要求 - 極度重要】
+- 絕對不可使用 Markdown 格式
+- 不可使用 **粗體**、*斜體*、# 標題等任何 Markdown 語法
+- 使用純文字輸出,不需任何格式標記
+- 如需強調,使用「」或直接加強語氣的文字即可
 """
 
             user_prompt = f"""請將以下新聞改寫成 ETtoday 風格的專業報導:
@@ -354,11 +403,16 @@ class NewsDashboard:
 
                 result = json.loads(response_text.strip())
 
+                # 清理 Markdown 格式
+                clean_title = self.clean_markdown(result.get('title', ''))
+                clean_lead = self.clean_markdown(result.get('lead', ''))
+                clean_body = self.clean_markdown(result.get('body', ''))
+
                 return {
                     'success': True,
-                    'title': result.get('title', ''),
-                    'lead': result.get('lead', ''),
-                    'body': result.get('body', ''),
+                    'title': clean_title,
+                    'lead': clean_lead,
+                    'body': clean_body,
                     'original_title': original_title,
                     'original_url': original_url,
                     'model': 'claude-sonnet-4-20250514',
@@ -366,11 +420,14 @@ class NewsDashboard:
                 }
 
             except json.JSONDecodeError:
+                # 清理 Markdown 格式
+                clean_text = self.clean_markdown(response_text)
+
                 return {
                     'success': True,
                     'title': original_title,
-                    'lead': response_text[:250],
-                    'body': response_text,
+                    'lead': clean_text[:250],
+                    'body': clean_text,
                     'original_title': original_title,
                     'original_url': original_url,
                     'model': 'claude-sonnet-4-20250514',
@@ -496,7 +553,7 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
 
     print("=" * 60)
-    print("🚀 新聞監控儀表板啟動中...")
+    print("🚀 新聞監控儀表板 v1.1 (Prototype) 啟動中...")
     print("📍 訪問: http://localhost:8080")
     print("=" * 60)
     print("💡 使用方式: System Prompt + 唐鎮宇寫作技能")
