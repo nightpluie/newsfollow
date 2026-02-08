@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Dashboard - ETtoday 比對系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: #1a1a2e;
+            color: white;
+            padding: 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+        }
+
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #F97316;
+            margin-bottom: 4px;
+        }
+
+        .logo-subtitle {
+            font-size: 12px;
+            color: #a8a8b3;
+            font-weight: 400;
+        }
+
+        .sidebar-nav {
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            color: #a8a8b3;
+            text-decoration: none;
+            display: block;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.05);
+            color: white;
+        }
+
+        .nav-item.active {
+            background: rgba(249,115,22,0.1);
+            color: #F97316;
+            border-left-color: #F97316;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 0;
+        }
+
+        .top-bar {
+            background: white;
+            padding: 24px 40px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #E2E8F0;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0F172A;
+            letter-spacing: -0.03em;
+        }
+
+        .action-btn {
+            background: #F97316;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .action-btn:hover {
+            background: #EA580C;
+            box-shadow: 0 4px 12px rgba(249,115,22,0.3);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .content-area {
+            padding: 30px 40px;
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .stat-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .stat-item:nth-child(1) {
+            border-bottom-color: #2563EB;
+        }
+
+        .stat-item:nth-child(2) {
+            border-bottom-color: #7C3AED;
+        }
+
+        .stat-item:nth-child(3) {
+            border-bottom-color: #D97706;
+        }
+
+        .stat-item:nth-child(4) {
+            border-bottom-color: #059669;
+        }
+
+        .stat-item:nth-child(5) {
+            border-bottom-color: #0EA5E9;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #64748B;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .primary-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            margin-bottom: 30px;
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+            border-bottom: 3px solid #F97316;
+            padding: 24px 28px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #9A3412;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .section-badge {
+            background: #F97316;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 15px;
+            font-weight: 700;
+            box-shadow: 0 2px 4px rgba(249,115,22,0.3);
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .missing-list {
+            padding: 28px;
+            background: #FAFAFA;
+        }
+
+        .missing-item {
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-left: 4px solid #F97316;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+            transition: all 0.2s;
+        }
+
+        .missing-item:hover {
+            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+            border-color: #CBD5E1;
+        }
+
+        .missing-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .missing-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0F172A;
+            line-height: 1.6;
+            flex: 1;
+            padding-right: 20px;
+        }
+
+        .rewrite-btn {
+            background: #F97316;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(249,115,22,0.2);
+        }
+
+        .rewrite-btn:hover {
+            background: #EA580C;
+            box-shadow: 0 4px 12px rgba(249,115,22,0.4);
+            transform: translateY(-1px);
+        }
+
+        .missing-title-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .star-rating {
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .importance-score {
+            background: rgba(249,115,22,0.1);
+            color: #F97316;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .missing-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sources-column {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .meta-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .source-details-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-left: 0;
+        }
+
+        .source-detail-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: #F8FAFC;
+            border-radius: 6px;
+            border: 1px solid #E2E8F0;
+            transition: all 0.2s;
+        }
+
+        .source-detail-item:hover {
+            background: white;
+            border-color: #CBD5E1;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .source-title-link {
+            flex: 1;
+            color: #0F172A;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.5;
+            transition: color 0.2s;
+        }
+
+        .source-title-link:hover {
+            color: #F97316;
+            text-decoration: underline;
+        }
+
+        .sources-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .source-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .source-badge:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .source-badge.udn {
+            background: #2563EB;
+            color: white;
+        }
+
+        .source-badge.tvbs {
+            background: #7C3AED;
+            color: white;
+        }
+
+        .source-badge.chinatimes,
+        .source-badge.中時新聞網 {
+            background: #D97706;
+            color: white;
+        }
+
+        .source-badge.setn,
+        .source-badge.三立新聞網 {
+            background: #059669;
+            color: white;
+        }
+
+        .source-badge.ettoday {
+            background: #0EA5E9;
+            color: white;
+        }
+
+        .collapsible-section {
+            margin-top: 30px;
+        }
+
+        .collapse-header {
+            background: white;
+            border-radius: 8px;
+            padding: 20px 24px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            border: 1px solid #E2E8F0;
+        }
+
+        .collapse-header:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: #CBD5E1;
+        }
+
+        .collapse-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0F172A;
+            letter-spacing: -0.02em;
+        }
+
+        .collapse-icon {
+            transition: transform 0.3s ease;
+            color: #64748B;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .collapse-icon.open {
+            transform: rotate(180deg);
+        }
+
+        .collapse-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapse-content.open {
+            max-height: 2000px;
+            transition: max-height 0.5s ease-in;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 0 0 8px 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            margin-top: 2px;
+            border: 1px solid #E2E8F0;
+            border-top: none;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%);
+            border-bottom: 2px solid #CBD5E1;
+        }
+
+        .data-table th {
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .data-table tbody tr {
+            border-bottom: 1px solid #F1F5F9;
+            transition: all 0.2s;
+        }
+
+        .data-table tbody tr:hover {
+            background: #F8FAFC;
+            box-shadow: inset 0 0 0 1px #E2E8F0;
+        }
+
+        .data-table td {
+            padding: 16px 20px;
+            font-size: 14px;
+            color: #334155;
+        }
+
+        .data-table td a {
+            color: #0F172A;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .data-table td a:hover {
+            color: #F97316;
+        }
+
+        .link-btn {
+            color: #3b82f6;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .link-btn:hover {
+            text-decoration: underline;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-box {
+            background: white;
+            border-radius: 12px;
+            padding: 40px 50px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border: 1px solid #E2E8F0;
+        }
+
+        .spinner {
+            border: 4px solid #F1F5F9;
+            border-top: 4px solid #F97316;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 15px;
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .rewrite-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .rewrite-modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .rewrite-content {
+            background: white;
+            border-radius: 12px;
+            padding: 36px;
+            max-width: 900px;
+            width: 100%;
+            margin-top: 50px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.35);
+            border: 1px solid #E2E8F0;
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #F97316;
+            letter-spacing: -0.02em;
+        }
+
+        .rewrite-section {
+            margin-bottom: 28px;
+        }
+
+        .rewrite-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 10px;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .rewrite-text {
+            background: #F8FAFC;
+            padding: 18px;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+            color: #1E293B;
+            line-height: 1.8;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .original-info {
+            background: #FFF7ED;
+            border: 2px solid #FED7AA;
+            border-left: 4px solid #F97316;
+            padding: 18px;
+            border-radius: 8px;
+            margin-bottom: 28px;
+            font-size: 14px;
+            color: #9A3412;
+            line-height: 1.6;
+        }
+
+        .source-selection {
+            background: #F0F9FF;
+            border: 2px solid #BAE6FD;
+            border-left: 4px solid #0EA5E9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 28px;
+        }
+
+        .source-checkboxes {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 16px;
+            margin-bottom: 16px;
+        }
+
+        .source-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: white;
+            border: 2px solid #E0F2FE;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .source-checkbox-item:hover {
+            background: #F0F9FF;
+            border-color: #0EA5E9;
+            box-shadow: 0 2px 6px rgba(14,165,233,0.15);
+        }
+
+        .source-checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #0EA5E9;
+        }
+
+        .source-checkbox-item label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 15px;
+            color: #0F172A;
+            font-weight: 600;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 28px;
+            padding-top: 24px;
+            border-top: 2px solid #E2E8F0;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #475569;
+            border: 2px solid #CBD5E1;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .btn-secondary:hover {
+            background: #F8FAFC;
+            border-color: #94A3B8;
+            color: #1E293B;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #94a3b8;
+        }
+
+        .empty-state-icon {
+            margin: 0 auto 16px;
+            opacity: 0.4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .empty-state-text {
+            font-size: 16px;
+            font-weight: 500;
+            color: #64748B;
+        }
+
+        @media (max-width: 1200px) {
+            .stats-bar {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                height: auto;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .missing-header {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .rewrite-btn {
+                width: 100%;
+            }
+
+            .missing-title {
+                font-size: 16px;
+            }
+
+            .sources-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-bar {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">News Dashboard</div>
+            <div class="logo-subtitle">內容監控系統</div>
+        </div>
+        <nav class="sidebar-nav">
+            <a class="nav-item active" data-section="dashboard">監控面板</a>
+            <a class="nav-item" data-section="sources">新聞來源</a>
+            <a class="nav-item" data-section="reports">分析報告</a>
+            <a class="nav-item" data-section="settings">設定</a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <div class="top-bar">
+            <h1 class="page-title">監控面板</h1>
+            <button class="action-btn" id="crawlBtn" onclick="startCrawl()">
+                開始分析
+            </button>
+        </div>
+
+        <div class="content-area">
+            <div class="stats-bar" id="statsBar" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-label">UDN 聯合新聞網</div>
+                    <div class="stat-value" id="udnCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">TVBS 新聞網</div>
+                    <div class="stat-value" id="tvbsCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">中時新聞網</div>
+                    <div class="stat-value" id="chinatimesCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">三立新聞網</div>
+                    <div class="stat-value" id="setnCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">ETtoday 新聞雲</div>
+                    <div class="stat-value" id="ettodayCount">0</div>
+                </div>
+            </div>
+
+            <!-- 主要區域：ET 缺少的新聞 -->
+            <div class="primary-section" id="missingSection" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">
+                        ETtoday 缺少的新聞
+                    </div>
+                    <span class="section-badge" id="missingCount">0</span>
+                </div>
+                <div class="missing-list" id="missingList"></div>
+            </div>
+
+            <!-- 可折疊區域：完整新聞列表 -->
+            <div class="collapsible-section" id="sourceSection" style="display: none;">
+                <div class="collapse-header" onclick="toggleCollapse()">
+                    <div class="collapse-title">完整新聞列表</div>
+                    <div class="collapse-icon" id="collapseIcon">▼</div>
+                </div>
+                <div class="collapse-content" id="collapseContent">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>新聞標題</th>
+                                    <th style="width: 120px;">來源</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sourceTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="empty-state" id="emptyState">
+                <div class="empty-state-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5V7H9V5Z" stroke="#CBD5E1" stroke-width="2"/>
+                        <path d="M9 12H15M9 16H12" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="empty-state-text">點擊「開始分析」開始監控新聞來源</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <div class="loading-text">正在分析新聞來源...</div>
+        </div>
+    </div>
+
+    <div class="rewrite-modal" id="rewriteModal">
+        <div class="rewrite-content">
+            <div class="modal-header">AI 改寫設定</div>
+
+            <div class="original-info" id="originalInfo"></div>
+
+            <!-- 來源選擇區 -->
+            <div class="source-selection" id="sourceSelection" style="display: none;">
+                <label class="rewrite-label">選擇要載入的新聞來源</label>
+                <div class="source-checkboxes" id="sourceCheckboxes"></div>
+                <div style="margin-top: 12px;">
+                    <button class="action-btn" onclick="startRewrite()">
+                        開始改寫
+                    </button>
+                </div>
+            </div>
+
+            <div class="rewrite-section">
+                <label class="rewrite-label">改寫標題</label>
+                <div class="rewrite-text" id="rewriteTitle"></div>
+            </div>
+
+            <div class="rewrite-section">
+                <label class="rewrite-label">內文</label>
+                <div class="rewrite-text" id="rewriteBody"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        // 側邊欄導航
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+
+                const section = this.getAttribute('data-section');
+                console.log('切換到: ' + section);
+                // 可以在這裡添加不同頁面的切換邏輯
+            });
+        });
+
+        // 折疊/展開完整列表
+        function toggleCollapse() {
+            const content = document.getElementById('collapseContent');
+            const icon = document.getElementById('collapseIcon');
+            content.classList.toggle('open');
+            icon.classList.toggle('open');
+        }
+
+        async function startCrawl() {
+            const btn = document.getElementById('crawlBtn');
+            const loading = document.getElementById('loading');
+            const statsBar = document.getElementById('statsBar');
+            const sourceSection = document.getElementById('sourceSection');
+            const missingSection = document.getElementById('missingSection');
+            const emptyState = document.getElementById('emptyState');
+
+            btn.disabled = true;
+            loading.classList.add('active');
+            statsBar.style.display = 'none';
+            sourceSection.style.display = 'none';
+            missingSection.style.display = 'none';
+            emptyState.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/crawl', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentData = data;
+                    displayResults(data);
+                } else {
+                    alert('分析失敗: ' + data.error);
+                    emptyState.style.display = 'block';
+                }
+            } catch (error) {
+                alert('發生錯誤: ' + error.message);
+                emptyState.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                loading.classList.remove('active');
+            }
+        }
+
+        function displayResults(data) {
+            const statsBar = document.getElementById('statsBar');
+            const sourceSection = document.getElementById('sourceSection');
+            const missingSection = document.getElementById('missingSection');
+            const emptyState = document.getElementById('emptyState');
+
+            // 更新統計數據
+            document.getElementById('udnCount').textContent = (data.udn || []).length;
+            document.getElementById('tvbsCount').textContent = (data.tvbs || []).length;
+            document.getElementById('chinatimesCount').textContent = (data['中時新聞網'] || []).length;
+            document.getElementById('setnCount').textContent = (data['三立新聞網'] || []).length;
+            document.getElementById('ettodayCount').textContent = data.ettoday.length;
+
+            statsBar.style.display = 'flex';
+            emptyState.style.display = 'none';
+
+            // 優先顯示缺少的新聞
+            if (data.missing && data.missing.length > 0) {
+                displayMissingNews(data.missing);
+                missingSection.style.display = 'block';
+            }
+
+            // 顯示完整新聞表格（可折疊）
+            displaySourceTable(data);
+            sourceSection.style.display = 'block';
+        }
+
+        function displaySourceTable(data) {
+            const tbody = document.getElementById('sourceTableBody');
+            const allNews = [];
+
+            // 添加所有來源的新聞
+            if (data.udn) data.udn.forEach(item => allNews.push({...item, source: 'UDN', sourceBadge: 'udn'}));
+            if (data.tvbs) data.tvbs.forEach(item => allNews.push({...item, source: 'TVBS', sourceBadge: 'tvbs'}));
+            if (data['中時新聞網']) data['中時新聞網'].forEach(item => allNews.push({...item, source: '中時新聞網', sourceBadge: 'chinatimes'}));
+            if (data['三立新聞網']) data['三立新聞網'].forEach(item => allNews.push({...item, source: '三立新聞網', sourceBadge: 'setn'}));
+            if (data.ettoday) data.ettoday.forEach(item => allNews.push({...item, source: 'ETtoday', sourceBadge: 'ettoday'}));
+
+            tbody.innerHTML = allNews.map(item => `
+                <tr>
+                    <td>
+                        <a href="${escapeHtml(item.url)}" target="_blank" class="link-btn" style="color: #1e293b; text-decoration: none; display: block; font-weight: 500;">
+                            ${escapeHtml(item.title)}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="source-badge ${item.sourceBadge}">${escapeHtml(item.source)}</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function displayMissingNews(items) {
+            const list = document.getElementById('missingList');
+            const count = document.getElementById('missingCount');
+
+            count.textContent = items.length;
+            list.innerHTML = items.map((item, index) => {
+                // 只顯示星級評分（不顯示數字分數）
+                const starRating = item.star_rating || '';
+
+                // 建立來源詳細列表（顯示每個來源的標題和連結）
+                const sourcesList = (item.source_details || []).map(detail => {
+                    let badgeClass = detail.source.toLowerCase();
+                    if (detail.source === '中時新聞網') badgeClass = 'chinatimes';
+                    if (detail.source === '三立新聞網') badgeClass = 'setn';
+
+                    return `
+                        <div class="source-detail-item">
+                            <span class="source-badge ${badgeClass}">${escapeHtml(detail.source)}</span>
+                            <a href="${escapeHtml(detail.url)}" target="_blank" class="source-title-link">
+                                ${escapeHtml(detail.title)}
+                            </a>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="missing-item">
+                        <div class="missing-header">
+                            <div class="missing-title-container">
+                                ${starRating ? `<span class="star-rating">${starRating}</span>` : ''}
+                                <div class="missing-title">${escapeHtml(item.title)}</div>
+                            </div>
+                            <button class="rewrite-btn" onclick="rewriteNews(${index})">
+                                AI 改寫
+                            </button>
+                        </div>
+                        <div class="missing-meta">
+                            <div class="sources-column">
+                                <span class="meta-label">來源報導:</span>
+                                <div class="source-details-list">
+                                    ${sourcesList}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        let currentRewriteIndex = null;
+
+        function rewriteNews(index) {
+            currentRewriteIndex = index;
+            const item = currentData.missing[index];
+            const modal = document.getElementById('rewriteModal');
+            const sourceSelection = document.getElementById('sourceSelection');
+            const sourceCheckboxes = document.getElementById('sourceCheckboxes');
+
+            // 使用 source_details（已去重）來建立來源列表
+            const sourceDetails = item.source_details || [];
+            const uniqueSources = sourceDetails.map(d => d.source);
+
+            document.getElementById('originalInfo').innerHTML = `
+                <strong>原始新聞:</strong> ${escapeHtml(item.title)}<br>
+                <strong>可用來源:</strong> ${uniqueSources.map(s => escapeHtml(s)).join(', ')}<br>
+                <strong>說明:</strong> 請選擇要載入的新聞來源，系統將綜合這些來源改寫為新聞報導
+            `;
+
+            // 建立來源選擇 checkbox（使用 source_details，已去重）
+            sourceCheckboxes.innerHTML = sourceDetails.map(detail => {
+                const sourceId = detail.source.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return `
+                    <div class="source-checkbox-item">
+                        <input type="checkbox" id="source-${sourceId}" value="${escapeHtml(detail.source)}" checked>
+                        <label for="source-${sourceId}">${escapeHtml(detail.source)}</label>
+                    </div>
+                `;
+            }).join('');
+
+            // 顯示來源選擇區，隱藏改寫結果
+            sourceSelection.style.display = 'block';
+            document.getElementById('rewriteTitle').innerHTML = '';
+            document.getElementById('rewriteBody').innerHTML = '';
+
+            modal.classList.add('active');
+        }
+
+        async function startRewrite() {
+            const item = currentData.missing[currentRewriteIndex];
+            const sourceSelection = document.getElementById('sourceSelection');
+
+            // 取得選中的來源
+            const selectedSources = Array.from(
+                document.querySelectorAll('.source-checkbox-item input[type="checkbox"]:checked')
+            ).map(checkbox => checkbox.value);
+
+            if (selectedSources.length === 0) {
+                alert('請至少選擇一個來源');
+                return;
+            }
+
+            // 隱藏來源選擇，顯示載入中
+            sourceSelection.style.display = 'none';
+
+            const sourceText = selectedSources.length > 1
+                ? `綜合 ${selectedSources.join(' + ')} 的報導內容`
+                : `根據 ${selectedSources[0]} 的報導內容`;
+
+            document.getElementById('originalInfo').innerHTML = `
+                <strong>原始新聞:</strong> ${escapeHtml(item.title)}<br>
+                <strong>使用來源:</strong> ${selectedSources.map(s => escapeHtml(s)).join(', ')}<br>
+                <strong>說明:</strong> 系統將${sourceText}改寫為新聞報導
+            `;
+
+            document.getElementById('rewriteTitle').innerHTML = '<div class="spinner" style="width: 30px; height: 30px; border-width: 2px; margin: 10px auto;"></div><div style="text-align: center; color: #64748b; margin-top: 10px;">AI 改寫中...</div>';
+            document.getElementById('rewriteBody').innerHTML = '';
+
+            try {
+                const response = await fetch('/api/rewrite', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: item.title,
+                        url: item.url,
+                        normalized_title: item.normalized_title,
+                        sources: selectedSources  // 只傳送選中的來源
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('rewriteTitle').textContent = result.title;
+                    document.getElementById('rewriteBody').textContent = result.body;
+                } else {
+                    document.getElementById('rewriteTitle').innerHTML = `<span style="color: #dc2626;">改寫失敗: ${escapeHtml(result.error)}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('rewriteTitle').innerHTML = `<span style="color: #dc2626;">發生錯誤: ${escapeHtml(error.message)}</span>`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('rewriteModal').classList.remove('active');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.getElementById('rewriteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+interval_seconds: 180
+event_threshold: 11
+cluster_similarity: 0.74
+crawler_backend: requests   # requests | openclaw
+
+database_path: ./newsfollow.db
+
+llm:
+  enabled: true
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.4
+  max_tokens: 1200
+  style_prompt: >
+    Write in concise breaking-news style for Taiwan digital media.
+    Lead with key development, keep source attributions, no speculation.
+
+publisher:
+  mode: stub            # stub | command
+  publish_command: ""   # e.g. python /path/to/your_publisher.py
+
+mobile_push:
+  enabled: false        # reserved for future Android push monitor
+
+sources:
+  - source_id: udn
+    source_name: UDN
+    domain_contains: udn.com
+    sections:
+      - section_id: homepage
+        url: https://udn.com/news/index
+        weight: 5
+        max_items: 20
+        selectors:
+          - "a.story-list__title-link"
+          - ".story-list a"
+          - "main a[href*='/news/story/']"
+      - section_id: marquee
+        url: https://udn.com/news/index
+        weight: 6
+        max_items: 12
+        selectors:
+          - ".breaking-news a"
+          - ".news-bar a"
+          - ".newsList a[href*='/news/story/']"
+      - section_id: hot
+        url: https://udn.com/rank/pv
+        weight: 4
+        max_items: 20
+        selectors:
+          - ".ranking-list a"
+          - "table a[href*='/news/story/']"
+          - "main a[href*='/news/story/']"
+
+  - source_id: tvbs
+    source_name: TVBS
+    domain_contains: news.tvbs.com.tw
+    sections:
+      - section_id: homepage
+        url: https://news.tvbs.com.tw/
+        weight: 5
+        max_items: 20
+        selectors:
+          - "a.news__title"
+          - "a[href*='news.tvbs.com.tw/'][title]"
+          - "main a[href*='news.tvbs.com.tw/']"
+      - section_id: marquee
+        url: https://news.tvbs.com.tw/
+        weight: 6
+        max_items: 12
+        selectors:
+          - ".breakingNews a"
+          - ".marquee a"
+          - ".rolling a"
+      - section_id: hot
+        url: https://news.tvbs.com.tw/hot
+        weight: 4
+        max_items: 20
+        selectors:
+          - ".hot a"
+          - ".popular a"
+          - "main a[href*='news.tvbs.com.tw/']"
