@@ -26,8 +26,6 @@ Thumbs.db
 # Logs
 *.log
 
-# Database
+# Database (contains user data)
 *.db
 
-# Config (contains custom settings)
-config.yaml

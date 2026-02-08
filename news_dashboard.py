@@ -28,6 +28,7 @@ from main import (
     normalize_title,
     now_iso,
 )
+from hybrid_similarity import HybridSimilarityChecker
 
 app = Flask(__name__)
 CORS(app)
@@ -66,6 +67,10 @@ class NewsDashboard:
         if not CLAUDE_API_KEY:
             print("⚠️  未設定 ANTHROPIC_API_KEY 環境變數，改寫功能將無法使用")
         self.claude = anthropic.Anthropic(api_key=CLAUDE_API_KEY) if CLAUDE_API_KEY else None
+
+        # 初始化混合相似度檢查器（演算法 + LLM）
+        self.similarity_checker = HybridSimilarityChecker(enable_llm=True)
+        print("✅ 混合相似度檢查器已啟用（演算法 + GPT-4o-mini）")
 
     def crawl_source(self, source_config: Dict) -> List[NewsItem]:
         """爬取單一媒體來源"""
@@ -155,13 +160,28 @@ class NewsDashboard:
 
     def find_missing_news(self, udn_items: List[NewsItem], tvbs_items: List[NewsItem],
                          ettoday_items: List[NewsItem]) -> List[Dict]:
-        """找出 ETtoday 沒有的新聞"""
-        ettoday_titles = {item.normalized_title for item in ettoday_items}
+        """
+        找出 ETtoday 沒有的新聞
+        使用混合策略（演算法 + LLM）進行相似度比對
+        """
+        # 收集 ETtoday 所有標題（用於混合比對）
+        ettoday_titles_list = [item.title for item in ettoday_items]
         all_items = udn_items + tvbs_items
+
+        # 重置統計資訊
+        self.similarity_checker.reset_statistics()
 
         missing = []
         for item in all_items:
-            if item.normalized_title not in ettoday_titles:
+            # 使用混合策略檢查是否在 ETtoday 中存在
+            is_in_ettoday = self.similarity_checker.batch_check(
+                candidate_title=item.title,
+                reference_titles=ettoday_titles_list
+            )
+
+            # 只有當確定不在 ETtoday 時，才加入缺少列表
+            if not is_in_ettoday:
+                # 避免重複（檢查是否已在 missing 列表中）
                 if not any(m['normalized_title'] == item.normalized_title for m in missing):
                     missing.append({
                         'source': item.source,
@@ -170,6 +190,10 @@ class NewsDashboard:
                         'normalized_title': item.normalized_title,
                         'crawled_at': item.crawled_at,
                     })
+
+        # 顯示統計資訊
+        stats = self.similarity_checker.get_statistics()
+        print(f"📊 相似度比對統計: LLM 調用次數 = {stats['llm_call_count']}")
 
         return missing
 
