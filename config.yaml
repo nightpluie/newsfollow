@@ -55,6 +55,8 @@ sources:
   - source_id: tvbs
     source_name: TVBS
     domain_contains: news.tvbs.com.tw
+    exclude_patterns:
+      - "/english"
     sections:
       - section_id: homepage
         url: https://news.tvbs.com.tw/

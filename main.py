@@ -766,6 +766,7 @@ def _extract_signals_fallback(
     weight: int,
     crawled_at: str,
     max_items: int,
+    exclude_patterns: List[str] = None,
 ) -> List[Signal]:
     parser = _FallbackAnchorParser()
     parser.feed(html)
@@ -783,6 +784,7 @@ def _extract_signals_fallback(
             domain_contains=domain_contains,
             weight=weight,
             crawled_at=crawled_at,
+            exclude_patterns=exclude_patterns,
         )
         if not candidate:
             continue
@@ -808,6 +810,7 @@ def extract_signals(
     weight: int,
     crawled_at: str,
     max_items: int,
+    exclude_patterns: List[str] = None,
 ) -> List[Signal]:
     if BeautifulSoup is None:
         return _extract_signals_fallback(
@@ -820,6 +823,7 @@ def extract_signals(
             weight=weight,
             crawled_at=crawled_at,
             max_items=max_items,
+            exclude_patterns=exclude_patterns,
         )
 
     soup = BeautifulSoup(html, "html.parser")
@@ -840,6 +844,7 @@ def extract_signals(
                     domain_contains=domain_contains,
                     weight=weight,
                     crawled_at=crawled_at,
+                    exclude_patterns=exclude_patterns,
                 )
                 if not candidate:
                     continue
@@ -862,6 +867,7 @@ def extract_signals(
             domain_contains=domain_contains,
             weight=weight,
             crawled_at=crawled_at,
+            exclude_patterns=exclude_patterns,
         )
         if not candidate:
             continue
@@ -885,6 +891,7 @@ def signal_from_anchor(
     domain_contains: str,
     weight: int,
     crawled_at: str,
+    exclude_patterns: List[str] = None,
 ) -> Optional[Signal]:
     if isinstance(a, dict):
         href = (a.get("href") or "").strip()
@@ -905,6 +912,12 @@ def signal_from_anchor(
 
     if domain_contains and domain_contains not in parsed.netloc:
         return None
+
+    # Check exclude patterns
+    if exclude_patterns:
+        for pattern in exclude_patterns:
+            if pattern in url:
+                return None
 
     text = extracted_text or extracted_title
     text = compact_space(text)

@@ -111,6 +111,7 @@ class NewsDashboard:
                     weight=section.get('weight', 1),
                     crawled_at=now_iso(),
                     max_items=section.get('max_items', 20),
+                    exclude_patterns=source_config.get('exclude_patterns', []),
                 )
 
                 for sig in signals:
