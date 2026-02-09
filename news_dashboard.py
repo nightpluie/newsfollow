@@ -84,10 +84,9 @@ class NewsDashboard:
         # 初始化混合相似度檢查器（演算法 + LLM）
         self.similarity_checker = HybridSimilarityChecker(
             api_key=OPENAI_API_KEY,
-            model=OPENAI_MODEL,
+            model=OPENAI_MODEL,  # 使用環境變數配置的模型（預設 gpt-4.1-nano）
             enable_llm=True,
-            timeout=10,        # API 請求超時 10 秒
-            max_llm_calls=500  # 單次分析最多 500 次 LLM 調用
+            timeout=10  # API 請求超時 10 秒（防止單次請求卡住）
         )
 
         # 初始化快取管理器（ETtoday 快取 5 分鐘）
@@ -530,6 +529,12 @@ def index():
 @app.route('/api/crawl', methods=['POST'])
 def api_crawl():
     """爬取所有來源（平行執行）"""
+    import time
+    start_time = time.time()
+    print(f"\n{'='*60}")
+    print(f"🚀 開始分析流程 (時間戳: {time.strftime('%Y-%m-%d %H:%M:%S')})")
+    print(f"{'='*60}")
+
     try:
         # 定義爬取任務
         def crawl_udn():
@@ -551,9 +556,9 @@ def api_crawl():
         def crawl_et():
             return ('ETtoday', dashboard.crawl_ettoday())
 
-        # 平行爬取所有來源（最多 5 個同時執行）
+        # 平行爬取所有來源（最多 2 個同時執行，減少記憶體壓力）
         results = {}
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             # 提交所有任務
             futures = [
                 executor.submit(crawl_udn),
@@ -567,6 +572,10 @@ def api_crawl():
             for future in as_completed(futures):
                 source_name, items = future.result()
                 results[source_name] = items
+
+        # 主動回收記憶體（釋放 BeautifulSoup 解析產生的大量物件）
+        import gc
+        gc.collect()
 
         # 提取結果
         udn_items = results.get('UDN', [])
@@ -584,10 +593,27 @@ def api_crawl():
         }
 
         # 找出 ETtoday 缺少的新聞（使用混合相似度策略）
+        print(f"\n⏱️  階段 1 完成（爬取）: {time.time() - start_time:.2f} 秒")
+        print(f"📊 爬取結果統計:")
+        for source, items in all_source_items.items():
+            print(f"   - {source}: {len(items)} 則")
+        print(f"   - ETtoday: {len(ettoday_items)} 則")
+
+        print(f"\n🔍 階段 2 開始（相似度比對）...")
+        stage2_start = time.time()
+
         missing_news = dashboard.find_missing_news(all_source_items, ettoday_items)
+
+        print(f"⏱️  階段 2 完成（比對）: {time.time() - stage2_start:.2f} 秒")
 
         # 取得 LLM 調用次數統計
         llm_calls = dashboard.similarity_checker.llm_call_count
+        print(f"📊 LLM 調用統計: {llm_calls} 次")
+
+        total_time = time.time() - start_time
+        print(f"\n✅ 分析完成！總耗時: {total_time:.2f} 秒")
+        print(f"   - 找到缺少新聞: {len(missing_news)} 則")
+        print(f"{'='*60}\n")
 
         return jsonify({
             'success': True,
@@ -598,10 +624,20 @@ def api_crawl():
             'ettoday': [{'source': i.source, 'title': i.title, 'url': i.url} for i in ettoday_items],
             'missing': missing_news,
             'llm_calls': llm_calls,
+            'total_time': f"{total_time:.2f}s",
         })
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"\n❌ 錯誤發生:")
+        print(error_detail)
+        print(f"{'='*60}\n")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__,
+        }), 500
 
 
 @app.route('/api/rewrite', methods=['POST'])

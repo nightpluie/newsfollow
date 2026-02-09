@@ -1044,6 +1044,14 @@ def title_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+from functools import lru_cache
+
+@lru_cache(maxsize=10000)
+def get_jieba_tokens(text: str) -> tuple:
+    """取得 jieba 分詞結果（含快取）"""
+    return tuple(jieba.cut(text.lower()))
+
+
 def _improved_similarity(title1: str, title2: str) -> float:
     """使用 jieba 分詞的改進相似度算法"""
 
@@ -1058,8 +1066,8 @@ def _improved_similarity(title1: str, title2: str) -> float:
 
     # 分詞
     import re
-    tokens1 = list(jieba.cut(title1.lower()))
-    tokens2 = list(jieba.cut(title2.lower()))
+    tokens1 = list(get_jieba_tokens(title1))
+    tokens2 = list(get_jieba_tokens(title2))
 
     # 過濾停用詞和標點
     tokens1 = [t.strip() for t in tokens1 if t.strip() and t not in stopwords and not re.match(r'^[^\w]+$', t)]
