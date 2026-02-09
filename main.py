@@ -28,9 +28,6 @@ from collections import Counter
 import math
 
 import requests
-import urllib3
-# 隱藏 ETtoday SSL 憑證問題的警告
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import yaml
 
 try:
@@ -1095,21 +1092,12 @@ def _improved_similarity(title1: str, title2: str) -> float:
     magnitude2 = math.sqrt(sum(v ** 2 for v in vec2))
     cosine = dot_product / (magnitude1 * magnitude2) if magnitude1 and magnitude2 else 0.0
 
-    # 計算最長公共子字串比例
+    # 計算最長公共子字串比例 (使用 SequenceMatcher 優化效能)
     s1_clean = re.sub(r'\s+', '', title1)
     s2_clean = re.sub(r'\s+', '', title2)
-    m, n = len(s1_clean), len(s2_clean)
-    if m > 0 and n > 0:
-        dp = [[0] * (n + 1) for _ in range(m + 1)]
-        max_len = 0
-        for i in range(1, m + 1):
-            for j in range(1, n + 1):
-                if s1_clean[i - 1] == s2_clean[j - 1]:
-                    dp[i][j] = dp[i - 1][j - 1] + 1
-                    max_len = max(max_len, dp[i][j])
-        lcs_ratio = max_len / min(m, n)
-    else:
-        lcs_ratio = 0.0
+    # SequenceMatcher.ratio() returns 2*M / T
+    # It is C-optimized and much faster than manual DP loop
+    lcs_ratio = SequenceMatcher(None, s1_clean, s2_clean).ratio()
 
     # 提取數字
     numbers1 = set(re.findall(r'\d+', title1))
