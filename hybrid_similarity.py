@@ -35,22 +35,20 @@ class HybridSimilarityChecker:
        - 簡單 prompt：判斷是否為同一事件
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini", enable_llm: bool = True, timeout: int = 10, max_llm_calls: int = 500):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4.1-nano-2025-04-14", enable_llm: bool = True, timeout: int = 10):
         """
         初始化混合檢查器
 
         Args:
             api_key: OpenAI API Key（如未提供則從環境變數讀取）
-            model: OpenAI 模型名稱（預設 gpt-4o-mini）
+            model: OpenAI 模型名稱（預設 gpt-4.1-nano-2025-04-14，更快更便宜）
             enable_llm: 是否啟用 LLM（False 則只用演算法）
             timeout: API 請求超時時間（秒），預設 10 秒
-            max_llm_calls: 單次分析的 LLM 調用上限（預設 500，避免過度調用）
         """
         self.enable_llm = enable_llm
         self.client = None
         self.model = model
         self.timeout = timeout
-        self.max_llm_calls = max_llm_calls
         self.llm_call_count = 0  # 統計 LLM 調用次數
 
         if enable_llm:
@@ -67,18 +65,15 @@ class HybridSimilarityChecker:
                 )
                 print(f"✅ 混合相似度檢查器已啟用 LLM 功能（{model}，timeout={timeout}s）")
 
-    def is_same_news(self, title1: str, title2: str) -> bool:
+    from main import TitleFeatures
+
+    def is_same_news(self, title1: Union[str, TitleFeatures], title2: Union[str, TitleFeatures]) -> bool:
         """
-        判斷兩則新聞是否為同一事件
-
-        Args:
-            title1: 第一則新聞標題
-            title2: 第二則新聞標題
-
-        Returns:
-            True 表示同一事件，False 表示不同事件
+        別斷兩則新聞是否為同一事件
+        支援字串或 TitleFeatures
         """
         # 階段 1：演算法快速過濾
+        # title_similarity 已經支援 TitleFeatures，直接傳遞即可
         algo_similarity = title_similarity(title1, title2)
 
         # 高相似度：直接判定為相同
@@ -91,11 +86,10 @@ class HybridSimilarityChecker:
 
         # 中間地帶（0.3-0.6）：使用 LLM 確認
         if self.enable_llm and self.client:
-            # 檢查是否超過調用次數上限
-            if self.llm_call_count >= self.max_llm_calls:
-                # 超過上限，降級到演算法（0.5 閾值）
-                return algo_similarity >= 0.5
-            return self._llm_check_similarity(title1, title2)
+            # LLM 需要原始文字
+            t1_text = title1.text if isinstance(title1, TitleFeatures) else title1
+            t2_text = title2.text if isinstance(title2, TitleFeatures) else title2
+            return self._llm_check_similarity(t1_text, t2_text)
         else:
             # 如果 LLM 未啟用，使用保守策略（0.5 閾值）
             return algo_similarity >= 0.5
@@ -103,13 +97,6 @@ class HybridSimilarityChecker:
     def _llm_check_similarity(self, title1: str, title2: str) -> bool:
         """
         使用 LLM 判斷兩則新聞是否為同一事件
-
-        Args:
-            title1: 第一則新聞標題
-            title2: 第二則新聞標題
-
-        Returns:
-            True 表示同一事件，False 表示不同事件
         """
         try:
             self.llm_call_count += 1
@@ -133,11 +120,7 @@ class HybridSimilarityChecker:
             )
 
             answer = response.choices[0].message.content.strip().lower()
-
-            # 記錄 LLM 判斷結果（用於調試）
             result = answer == "yes"
-            # print(f"  LLM 判斷: '{title1[:30]}...' vs '{title2[:30]}...' → {result}")
-
             return result
 
         except Exception as e:
@@ -150,16 +133,10 @@ class HybridSimilarityChecker:
             # 失敗時回退到演算法（0.5 閾值）
             return title_similarity(title1, title2) >= 0.5
 
-    def batch_check(self, candidate_title: str, reference_titles: List[str]) -> bool:
+    def batch_check(self, candidate_title: Union[str, TitleFeatures], reference_titles: List[Union[str, TitleFeatures]]) -> bool:
         """
         批次檢查：判斷候選標題是否與參考標題列表中的任何一則相同
-
-        Args:
-            candidate_title: 候選新聞標題
-            reference_titles: 參考新聞標題列表（例如 ETtoday 的所有標題）
-
-        Returns:
-            True 表示在參考列表中找到相同新聞，False 表示沒找到
+        支援傳入預計算的 TitleFeatures 以提升效能
         """
         for ref_title in reference_titles:
             if self.is_same_news(candidate_title, ref_title):

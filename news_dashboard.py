@@ -214,56 +214,69 @@ class NewsDashboard:
         使用混合策略（演算法 + LLM）進行相似度比對
         並將相同新聞分群顯示
         """
-        from main import title_similarity
+        from main import title_similarity, compute_title_features
         from news_importance import calculate_news_importance, format_star_rating
 
-        # 收集 ETtoday 所有標題（用於混合比對）
-        ettoday_titles_list = [item.title for item in ettoday_items]
+        # 預計算 ETtoday 所有標題特徵（用於混合比對）
+        # 這能大幅減少重複建立 Set/Counter 的記憶體開銷
+        ettoday_features_list = [compute_title_features(item.title) for item in ettoday_items]
 
         # 收集所有不在 ETtoday 的新聞（使用混合相似度比對）
         self.similarity_checker.reset_statistics()
         missing_items = []
 
+        # 用於群集的項目列表（儲存 (item, features)）
+        missing_items_with_features = []
+
         for source_name, items in all_source_items.items():
             for item in items:
+                # 預計算候選標題特徵
+                candidate_features = compute_title_features(item.title)
+                
                 # 使用混合策略檢查是否在 ETtoday 中存在
+                # 傳遞預計算的特徵物件
                 is_in_ettoday = self.similarity_checker.batch_check(
-                    candidate_title=item.title,
-                    reference_titles=ettoday_titles_list
+                    candidate_title=candidate_features,
+                    reference_titles=ettoday_features_list
                 )
 
                 # 只有當確定不在 ETtoday 時，才加入缺少列表
                 if not is_in_ettoday:
                     missing_items.append(item)
+                    missing_items_with_features.append((item, candidate_features))
 
         # 顯示統計資訊
         stats = self.similarity_checker.get_statistics()
         print(f"📊 相似度比對統計: LLM 調用次數 = {stats['llm_call_count']}")
 
         # 使用改進的相似度演算法進行群集（傳遞性群集）
+        # clusters 儲存結構: List[List[Tuple[NewsItem, TitleFeatures]]]
         clusters = []
-        for item in missing_items:
-            title = item.title
+        for item, features in missing_items_with_features:
             placed = False
 
             # 檢查是否與現有群集中的任何新聞相似
             for i, cluster in enumerate(clusters):
                 # 與群集中的每個項目比較
-                for existing_item in cluster:
+                for existing_item, existing_features in cluster:
                     # 使用 0.47 閾值（比 0.5 稍低，因為這是最終顯示用）
-                    if title_similarity(title, existing_item.title) >= 0.47:
-                        clusters[i].append(item)
+                    # 直接使用特徵進行比對
+                    if title_similarity(features, existing_features) >= 0.47:
+                        clusters[i].append((item, features))
                         placed = True
                         break
                 if placed:
                     break
 
             if not placed:
-                clusters.append([item])
+                clusters.append([(item, features)])
+        
+        # 還原 clusters 為純 NewsItem 列表以便後續處理
+        news_clusters = [[pair[0] for pair in cluster] for cluster in clusters]
 
         # 為每個群集建立新聞資訊
         news_by_cluster = []
-        for cluster in clusters:
+        for cluster in news_clusters:
             # 選擇最長的標題作為代表標題
             canonical_title = max((item.title for item in cluster), key=len)
             canonical_url = cluster[0].url

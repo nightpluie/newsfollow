@@ -1016,32 +1016,41 @@ def select_canonical_title(cluster: List[Signal]) -> str:
     return sorted_titles[0]
 
 
-def title_similarity(a: str, b: str) -> float:
+from typing import Union
+
+def title_similarity(a: Union[str, TitleFeatures], b: Union[str, TitleFeatures]) -> float:
     """
     改進的標題相似度演算法
-    使用多種指標的加權組合，能識別「同一新聞但不同切角」的標題
+    支援字串或預計算的 TitleFeatures 物件
     """
     if not a or not b:
         return 0.0
 
-    # 正規化
-    t1 = ' '.join(a.lower().split())
-    t2 = ' '.join(b.lower().split())
+    # 取得文字內容與正規化
+    t1_text = a.text if isinstance(a, TitleFeatures) else a
+    t2_text = b.text if isinstance(b, TitleFeatures) else b
+    
+    t1_norm = ' '.join(t1_text.lower().split())
+    t2_norm = ' '.join(t2_text.lower().split())
 
     # 完全相同
-    if t1 == t2:
+    if t1_norm == t2_norm:
         return 1.0
 
     # 子字串包含
-    if t1 in t2 or t2 in t1:
+    if t1_norm in t2_norm or t2_norm in t1_norm:
         return 0.85
 
     # 如果 jieba 可用，使用改進算法
     if JIEBA_AVAILABLE:
-        return _improved_similarity(a, b)
+        # 如果輸入已經是 Features，直接使用高效能版
+        if isinstance(a, TitleFeatures) and isinstance(b, TitleFeatures):
+            return _feature_similarity(a, b)
+        # 否則回退到字串版（會內部計算 Features）
+        return _improved_similarity(t1_text, t2_text)
 
     # 否則使用原始算法
-    return SequenceMatcher(None, a, b).ratio()
+    return SequenceMatcher(None, t1_text, t2_text).ratio()
 
 
 from functools import lru_cache
@@ -1052,10 +1061,24 @@ def get_jieba_tokens(text: str) -> tuple:
     return tuple(jieba.cut(text.lower()))
 
 
-def _improved_similarity(title1: str, title2: str) -> float:
-    """使用 jieba 分詞的改進相似度算法"""
+@dataclass
+class TitleFeatures:
+    """標題特徵類別（用於快取分詞結果與統計量）"""
+    text: str
+    tokens: List[str]
+    token_set: Set[str]
+    token_counter: Counter
+    clean_text: str
+    numbers: Set[str]
+    vec_magnitude: float
 
-    # 停用詞
+def compute_title_features(text: str) -> TitleFeatures:
+    """計算標題特徵（一次性計算，避免重複運算）"""
+    # 分詞
+    import re
+    tokens = list(get_jieba_tokens(text))
+
+    # 過濾停用詞和標點
     stopwords = {
         '的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一個',
         '上', '也', '很', '到', '說', '要', '去', '你', '會', '著', '沒有', '看', '好',
@@ -1063,47 +1086,54 @@ def _improved_similarity(title1: str, title2: str) -> float:
         '！', '？', '，', '。', '：', '；', '、', '「', '」', '『', '』', '（', '）',
         '【', '】', '《', '》', '〈', '〉', '．', '・', '…', '—', '～', '｜', '/', '|',
     }
+    filtered_tokens = [t.strip() for t in tokens if t.strip() and t not in stopwords and not re.match(r'^[^\w]+$', t)]
+    
+    # 計算集合與計數
+    token_set = set(filtered_tokens)
+    token_counter = Counter(filtered_tokens)
+    
+    # 計算向量長度
+    vec_magnitude = math.sqrt(sum(v ** 2 for v in token_counter.values()))
+    
+    # 清理後的文字（用於 LCS）
+    clean_text = re.sub(r'\s+', '', text)
+    
+    # 提取數字
+    numbers = set(re.findall(r'\d+', text))
+    
+    return TitleFeatures(
+        text=text,
+        tokens=filtered_tokens,
+        token_set=token_set,
+        token_counter=token_counter,
+        clean_text=clean_text,
+        numbers=numbers,
+        vec_magnitude=vec_magnitude
+    )
 
-    # 分詞
-    import re
-    tokens1 = list(get_jieba_tokens(title1))
-    tokens2 = list(get_jieba_tokens(title2))
-
-    # 過濾停用詞和標點
-    tokens1 = [t.strip() for t in tokens1 if t.strip() and t not in stopwords and not re.match(r'^[^\w]+$', t)]
-    tokens2 = [t.strip() for t in tokens2 if t.strip() and t not in stopwords and not re.match(r'^[^\w]+$', t)]
-
-    if not tokens1 or not tokens2:
+def _feature_similarity(f1: TitleFeatures, f2: TitleFeatures) -> float:
+    """使用預計算特徵的相似度演算法（高效能版）"""
+    if not f1.tokens or not f2.tokens:
         return 0.0
 
     # 計算 Jaccard 相似度
-    set1 = set(tokens1)
-    set2 = set(tokens2)
-    jaccard = len(set1 & set2) / len(set1 | set2) if set1 | set2 else 0.0
+    inter_len = len(f1.token_set & f2.token_set)
+    union_len = len(f1.token_set | f2.token_set)
+    jaccard = inter_len / union_len if union_len else 0.0
 
     # 計算餘弦相似度
-    counter1 = Counter(tokens1)
-    counter2 = Counter(tokens2)
-    all_tokens = set(counter1.keys()) | set(counter2.keys())
-    vec1 = [counter1.get(token, 0) for token in all_tokens]
-    vec2 = [counter2.get(token, 0) for token in all_tokens]
-    dot_product = sum(v1 * v2 for v1, v2 in zip(vec1, vec2))
-    magnitude1 = math.sqrt(sum(v ** 2 for v in vec1))
-    magnitude2 = math.sqrt(sum(v ** 2 for v in vec2))
-    cosine = dot_product / (magnitude1 * magnitude2) if magnitude1 and magnitude2 else 0.0
+    # 只需計算 dot product，分母 Magnitude 已經預計算
+    all_tokens = set(f1.token_counter.keys()) | set(f2.token_counter.keys())
+    dot_product = sum(f1.token_counter.get(t, 0) * f2.token_counter.get(t, 0) for t in all_tokens)
+    cosine = dot_product / (f1.vec_magnitude * f2.vec_magnitude) if f1.vec_magnitude and f2.vec_magnitude else 0.0
 
     # 計算最長公共子字串比例 (使用 SequenceMatcher 優化效能)
-    s1_clean = re.sub(r'\s+', '', title1)
-    s2_clean = re.sub(r'\s+', '', title2)
-    # SequenceMatcher.ratio() returns 2*M / T
-    # It is C-optimized and much faster than manual DP loop
-    lcs_ratio = SequenceMatcher(None, s1_clean, s2_clean).ratio()
+    # SequenceMatcher handles empty strings gracefully
+    lcs_ratio = SequenceMatcher(None, f1.clean_text, f2.clean_text).ratio()
 
-    # 提取數字
-    numbers1 = set(re.findall(r'\d+', title1))
-    numbers2 = set(re.findall(r'\d+', title2))
-    if numbers1 and numbers2:
-        number_match = len(numbers1 & numbers2) / len(numbers1 | numbers2)
+    # 數字匹配
+    if f1.numbers and f2.numbers:
+        number_match = len(f1.numbers & f2.numbers) / len(f1.numbers | f2.numbers)
     else:
         number_match = 0.0
 
@@ -1116,14 +1146,14 @@ def _improved_similarity(title1: str, title2: str) -> float:
     )
 
     # 檢查共同實體（長度 >= 2 的詞）
-    long_tokens1 = {t for t in set1 if len(t) >= 2}
-    long_tokens2 = {t for t in set2 if len(t) >= 2}
+    long_tokens1 = {t for t in f1.token_set if len(t) >= 2}
+    long_tokens2 = {t for t in f2.token_set if len(t) >= 2}
     common_tokens = long_tokens1 & long_tokens2
     has_entity = len(common_tokens) >= 2
 
     # 如果有共同實體，提升相似度
     if has_entity and 0.15 <= combined_similarity < 0.7:
-        common_keywords_count = len(set1 & set2)
+        common_keywords_count = len(f1.token_set & f2.token_set)
         if common_keywords_count >= 3:
             boost = 0.30
         elif common_keywords_count >= 2:
@@ -1133,10 +1163,16 @@ def _improved_similarity(title1: str, title2: str) -> float:
         combined_similarity = min(combined_similarity + boost, 0.85)
 
     # 如果數字匹配且有共同詞，額外加分
-    if numbers1 and numbers2 and number_match >= 0.5 and len(set1 & set2) >= 1:
+    if f1.numbers and f2.numbers and number_match >= 0.5 and len(f1.token_set & f2.token_set) >= 1:
         combined_similarity = min(combined_similarity + 0.15, 0.9)
 
     return combined_similarity
+
+def _improved_similarity(title1: str, title2: str) -> float:
+    """相容舊版接口的包裝函數"""
+    f1 = compute_title_features(title1)
+    f2 = compute_title_features(title2)
+    return _feature_similarity(f1, f2)
 
 
 def now_iso() -> str:
