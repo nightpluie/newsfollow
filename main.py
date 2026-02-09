@@ -28,6 +28,9 @@ from collections import Counter
 import math
 
 import requests
+import urllib3
+# 隱藏 ETtoday SSL 憑證問題的警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import yaml
 
 try:
