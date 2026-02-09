@@ -35,7 +35,7 @@ class HybridSimilarityChecker:
        - 簡單 prompt：判斷是否為同一事件
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini", enable_llm: bool = True):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini", enable_llm: bool = True, timeout: int = 10, max_llm_calls: int = 500):
         """
         初始化混合檢查器
 
@@ -43,10 +43,14 @@ class HybridSimilarityChecker:
             api_key: OpenAI API Key（如未提供則從環境變數讀取）
             model: OpenAI 模型名稱（預設 gpt-4o-mini）
             enable_llm: 是否啟用 LLM（False 則只用演算法）
+            timeout: API 請求超時時間（秒），預設 10 秒
+            max_llm_calls: 單次分析的 LLM 調用上限（預設 500，避免過度調用）
         """
         self.enable_llm = enable_llm
         self.client = None
         self.model = model
+        self.timeout = timeout
+        self.max_llm_calls = max_llm_calls
         self.llm_call_count = 0  # 統計 LLM 調用次數
 
         if enable_llm:
@@ -55,8 +59,13 @@ class HybridSimilarityChecker:
                 print("⚠️  未設定 OPENAI_API_KEY，LLM 比對功能將被停用")
                 self.enable_llm = False
             else:
-                self.client = OpenAI(api_key=api_key)
-                print(f"✅ 混合相似度檢查器已啟用 LLM 功能（{model}）")
+                # 設定 timeout 避免請求卡住
+                import httpx
+                self.client = OpenAI(
+                    api_key=api_key,
+                    timeout=httpx.Timeout(self.timeout, connect=5.0)  # 總超時 + 連接超時
+                )
+                print(f"✅ 混合相似度檢查器已啟用 LLM 功能（{model}，timeout={timeout}s）")
 
     def is_same_news(self, title1: str, title2: str) -> bool:
         """
@@ -82,6 +91,10 @@ class HybridSimilarityChecker:
 
         # 中間地帶（0.3-0.6）：使用 LLM 確認
         if self.enable_llm and self.client:
+            # 檢查是否超過調用次數上限
+            if self.llm_call_count >= self.max_llm_calls:
+                # 超過上限，降級到演算法（0.5 閾值）
+                return algo_similarity >= 0.5
             return self._llm_check_similarity(title1, title2)
         else:
             # 如果 LLM 未啟用，使用保守策略（0.5 閾值）
@@ -128,7 +141,12 @@ class HybridSimilarityChecker:
             return result
 
         except Exception as e:
-            print(f"❌ LLM 調用失敗: {e}")
+            # 區分超時錯誤和其他錯誤
+            import httpx
+            if isinstance(e, (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout)):
+                print(f"⏱️  LLM 調用超時，回退到演算法判斷")
+            else:
+                print(f"❌ LLM 調用失敗: {type(e).__name__}: {e}")
             # 失敗時回退到演算法（0.5 閾值）
             return title_similarity(title1, title2) >= 0.5
 

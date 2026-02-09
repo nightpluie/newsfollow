@@ -85,7 +85,9 @@ class NewsDashboard:
         self.similarity_checker = HybridSimilarityChecker(
             api_key=OPENAI_API_KEY,
             model=OPENAI_MODEL,
-            enable_llm=True
+            enable_llm=True,
+            timeout=10,        # API 請求超時 10 秒
+            max_llm_calls=500  # 單次分析最多 500 次 LLM 調用
         )
 
         # 初始化快取管理器（ETtoday 快取 5 分鐘）
@@ -327,64 +329,142 @@ class NewsDashboard:
         text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
         return text
 
-    def rewrite_with_claude(self, original_title: str, original_url: str) -> Dict:
-        """使用 Claude API 改寫新聞 (使用唐鎮宇技能指引)"""
+    def rewrite_with_claude(self, original_title: str, original_url: str, sources_data: List[Dict] = None) -> Dict:
+        """使用 Claude API 改寫新聞 (根據勾選的多個來源綜合改寫)"""
         try:
-            # 先嘗試抓取原文內容
-            try:
-                html = self.crawler.fetch_html(original_url)
-                soup = BeautifulSoup(html, 'html.parser')
-                paragraphs = soup.find_all('p')
-                original_content = '\n'.join([p.get_text(strip=True) for p in paragraphs[:10]])
-            except:
-                original_content = ""
+            # 如果沒有提供 sources_data，回傳錯誤
+            if not sources_data or len(sources_data) == 0:
+                return {
+                    'success': False,
+                    'error': '請至少勾選一個新聞來源',
+                    'original_title': original_title,
+                    'original_url': original_url,
+                }
+
+            # 抓取所有勾選來源的完整內容
+            all_sources_content = []
+            for source_info in sources_data:
+                source_name = source_info.get('source', '未知來源')
+                source_title = source_info.get('title', '')
+                source_url = source_info.get('url', '')
+
+                try:
+                    html = self.crawler.fetch_html(source_url)
+                    soup = BeautifulSoup(html, 'html.parser')
+                    paragraphs = soup.find_all('p')
+                    # 抓取最多 20 段
+                    content_paragraphs = [p.get_text(strip=True) for p in paragraphs[:20] if p.get_text(strip=True)]
+                    full_content = '\n\n'.join(content_paragraphs)
+
+                    if full_content:
+                        all_sources_content.append({
+                            'source': source_name,
+                            'title': source_title,
+                            'url': source_url,
+                            'content': full_content,
+                        })
+                    else:
+                        # 如果抓取失敗，記錄但繼續
+                        all_sources_content.append({
+                            'source': source_name,
+                            'title': source_title,
+                            'url': source_url,
+                            'content': '（無法取得完整內容）',
+                        })
+                except Exception as e:
+                    print(f"⚠️  抓取 {source_name} 內容失敗: {e}")
+                    all_sources_content.append({
+                        'source': source_name,
+                        'title': source_title,
+                        'url': source_url,
+                        'content': f'（抓取失敗: {str(e)}）',
+                    })
+
+            # 如果所有來源都抓取失敗，回傳錯誤
+            valid_sources = [s for s in all_sources_content if '（無法取得完整內容）' not in s['content'] and '（抓取失敗' not in s['content']]
+            if len(valid_sources) == 0:
+                return {
+                    'success': False,
+                    'error': '所有來源的內容都無法取得，無法進行改寫',
+                    'original_title': original_title,
+                    'original_url': original_url,
+                }
 
             # 準備包含唐鎮宇技能的 system prompt
             system_prompt = f"""你是一位專業的新聞記者。請嚴格遵循以下唐鎮宇的新聞報導寫作技能:
 
 {TCY_SKILL}
 
-重要提醒:
-1. 嚴格依據素材撰寫 - 只能根據提供的素材,禁止自行揣想或編造
-2. 倒金字塔結構 - 最重要資訊在前,依重要性遞減
-3. 金字塔原理 - 每段首句是核心論點,後續內容支撐該論點
-4. 導言涵蓋 5W1H - 何時、何地、何人、何事、為何、如何
-5. 數據先行 - 用具體數字、統計資料開場
-6. 250字導言 - 精煉核心重點,不超過250字
+【核心原則 - 絕對嚴格遵守】
+1. 絕對依據素材撰寫 - 只能根據提供的新聞來源內容改寫，不得添加任何原文沒有的資訊
+2. 禁止推測或編造 - 如果原文沒有提到的事情，絕對不要寫出來
+3. 禁止使用不具體的消息來源 - 不可使用「據了解」、「消息人士表示」、「有關人士指出」、「據悉」等模糊來源
+4. 內容必須可追溯 - 改寫的每一句話都必須能在提供的來源中找到對應的原文
+5. 不要延伸或推論 - 只改寫文字，不增加任何解釋、分析或延伸內容
 
-【格式要求 - 極度重要】
+【寫作技巧】
+1. 倒金字塔結構 - 最重要資訊在前，依重要性遞減
+2. 金字塔原理 - 每段首句是核心論點，後續內容支撐該論點
+3. 5W1H 導言 - 何時、何地、何人、何事、為何、如何
+4. 數據先行 - 用具體數字、統計資料開場（如果原文有提供）
+5. 多方聲音 - 如果原文有引述不同人的說法，要保留這些引述
+
+【格式要求】
 - 絕對不可使用 Markdown 格式
 - 不可使用 **粗體**、*斜體*、# 標題等任何 Markdown 語法
-- 使用純文字輸出,不需任何格式標記
-- 如需強調,使用「」或直接加強語氣的文字即可
+- 使用純文字輸出，不需任何格式標記
+- 如需強調，使用「」或直接加強語氣的文字即可
+
+【禁止事項 - 極度重要】
+❌ 不可添加原文沒有的數據、時間、地點、人名
+❌ 不可使用「據了解」、「消息人士」、「有關人士」等不具體來源
+❌ 不可推測事件的原因、影響或未來發展（除非原文有明確提到）
+❌ 不可編造任何引述或對話
+❌ 不可添加任何背景資訊（除非原文有提供）
 """
 
-            user_prompt = f"""請將以下新聞改寫成 ETtoday 風格的專業報導:
+            # 整理所有來源內容
+            sources_text = ""
+            for idx, source_data in enumerate(all_sources_content, 1):
+                sources_text += f"\n{'='*60}\n"
+                sources_text += f"來源 {idx}: {source_data['source']}\n"
+                sources_text += f"標題: {source_data['title']}\n"
+                sources_text += f"網址: {source_data['url']}\n"
+                sources_text += f"\n完整內容:\n{source_data['content']}\n"
 
-**原始標題:** {original_title}
-**原始來源:** {original_url}
+            user_prompt = f"""請根據以下 {len(all_sources_content)} 個新聞來源的實際內容，綜合改寫成一篇 ETtoday 風格的專業報導。
 
-**原始內容:**
-{original_content if original_content else "（無法取得完整內容,請根據標題推測並改寫,但請明確標示為推測內容）"}
+{sources_text}
 
-請提供:
-1. 新聞標題 (簡潔有力,50字以內)
-2. 導言 (250字以內,涵蓋 5W1H,數據先行)
-3. 完整內文 (依倒金字塔結構,約 400-600 字)
+{'='*60}
 
-請以 JSON 格式回傳:
-{{
-    "title": "改寫後的標題",
-    "lead": "導言內容 (250字內)",
-    "body": "完整內文 (400-600字)"
-}}
+【改寫要求】
+1. 標題：簡潔有力，50 字以內，必須基於上述來源內容
+2. 內文：完整報導，建議 800 字以內
+   - 使用倒金字塔結構
+   - 每個資訊都必須能在上述來源中找到對應內容
+   - 如果多個來源有不同說法，可以綜合呈現
+   - 絕對不要添加來源沒有的資訊
+
+【重要提醒】
+- 改寫時只能重新組織和潤飾上述來源的內容
+- 不可添加任何上述來源沒有提到的資訊
+- 不可使用「據了解」、「消息人士」等不具體來源
+- 每句話都必須有明確的來源依據
+
+請直接提供改寫後的標題和內文，不需要任何說明文字。
+
+格式如下：
+標題：（改寫後的標題）
+
+內文：（完整內文）
 """
 
             # 呼叫 Claude API
             message = self.claude.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=2000,
-                temperature=0.7,
+                temperature=0.3,  # 降低 temperature 減少創造性，增加事實性
                 system=system_prompt,
                 messages=[
                     {"role": "user", "content": user_prompt}
@@ -392,48 +472,41 @@ class NewsDashboard:
             )
 
             # 解析回應
-            response_text = message.content[0].text
+            response_text = message.content[0].text.strip()
 
-            # 嘗試提取 JSON
-            try:
-                if "```json" in response_text:
-                    response_text = response_text.split("```json")[1].split("```")[0]
-                elif "```" in response_text:
-                    response_text = response_text.split("```")[1].split("```")[0]
+            # 解析標題和內文
+            title = ""
+            body = ""
 
-                result = json.loads(response_text.strip())
+            if "標題：" in response_text or "標題:" in response_text:
+                # 提取標題
+                title_match = response_text.split("標題：" if "標題：" in response_text else "標題:")[1].split("\n")[0].strip()
+                title = title_match
 
-                # 清理 Markdown 格式
-                clean_title = self.clean_markdown(result.get('title', ''))
-                clean_lead = self.clean_markdown(result.get('lead', ''))
-                clean_body = self.clean_markdown(result.get('body', ''))
+                # 提取內文
+                if "內文：" in response_text:
+                    body = response_text.split("內文：")[1].strip()
+                elif "內文:" in response_text:
+                    body = response_text.split("內文:")[1].strip()
+            else:
+                # 如果沒有明確標記，使用原標題
+                title = original_title
+                body = response_text
 
-                return {
-                    'success': True,
-                    'title': clean_title,
-                    'lead': clean_lead,
-                    'body': clean_body,
-                    'original_title': original_title,
-                    'original_url': original_url,
-                    'model': 'claude-sonnet-4-20250514',
-                    'method': 'system_prompt_with_skill',
-                }
+            # 清理 Markdown 格式
+            clean_title = self.clean_markdown(title)
+            clean_body = self.clean_markdown(body)
 
-            except json.JSONDecodeError:
-                # 清理 Markdown 格式
-                clean_text = self.clean_markdown(response_text)
-
-                return {
-                    'success': True,
-                    'title': original_title,
-                    'lead': clean_text[:250],
-                    'body': clean_text,
-                    'original_title': original_title,
-                    'original_url': original_url,
-                    'model': 'claude-sonnet-4-20250514',
-                    'method': 'system_prompt_with_skill',
-                    'note': 'Failed to parse JSON, returning raw text',
-                }
+            return {
+                'success': True,
+                'title': clean_title,
+                'body': clean_body,
+                'original_title': original_title,
+                'original_url': original_url,
+                'sources_used': [s['source'] for s in all_sources_content],
+                'model': 'claude-sonnet-4-20250514',
+                'method': 'multi_source_rewrite',
+            }
 
         except Exception as e:
             return {
@@ -533,16 +606,21 @@ def api_crawl():
 
 @app.route('/api/rewrite', methods=['POST'])
 def api_rewrite():
-    """改寫單則新聞"""
+    """改寫單則新聞（根據勾選的多個來源）"""
     try:
         data = request.json
         title = data.get('title', '')
         url = data.get('url', '')
+        sources = data.get('sources', [])  # 勾選的來源列表
 
         if not title:
             return jsonify({'success': False, 'error': 'Title is required'}), 400
 
-        result = dashboard.rewrite_with_claude(title, url)
+        if not sources or len(sources) == 0:
+            return jsonify({'success': False, 'error': '請至少勾選一個新聞來源'}), 400
+
+        # 呼叫改寫函數，傳入勾選的來源
+        result = dashboard.rewrite_with_claude(title, url, sources)
         return jsonify(result)
 
     except Exception as e:

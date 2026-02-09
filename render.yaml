@@ -3,7 +3,7 @@ services:
     name: newsfollow
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn news_dashboard:app --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 120
+    startCommand: gunicorn news_dashboard:app --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 300
     envVars:
       - key: OPENAI_API_KEY
         sync: false

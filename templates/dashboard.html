@@ -1444,26 +1444,32 @@
             const item = currentData.missing[currentRewriteIndex];
             const sourceSelection = document.getElementById('sourceSelection');
 
-            // 取得選中的來源
-            const selectedSources = Array.from(
+            // 取得選中的來源名稱
+            const selectedSourceNames = Array.from(
                 document.querySelectorAll('.source-checkbox-item input[type="checkbox"]:checked')
             ).map(checkbox => checkbox.value);
 
-            if (selectedSources.length === 0) {
+            if (selectedSourceNames.length === 0) {
                 alert('請至少選擇一個來源');
                 return;
             }
 
+            // 從 source_details 中找到對應的完整資訊
+            const sourceDetails = item.source_details || [];
+            const selectedSourcesData = sourceDetails.filter(detail =>
+                selectedSourceNames.includes(detail.source)
+            );
+
             // 隱藏來源選擇，顯示載入中
             sourceSelection.style.display = 'none';
 
-            const sourceText = selectedSources.length > 1
-                ? `綜合 ${selectedSources.join(' + ')} 的報導內容`
-                : `根據 ${selectedSources[0]} 的報導內容`;
+            const sourceText = selectedSourceNames.length > 1
+                ? `綜合 ${selectedSourceNames.join(' + ')} 的報導內容`
+                : `根據 ${selectedSourceNames[0]} 的報導內容`;
 
             document.getElementById('originalInfo').innerHTML = `
                 <strong>原始新聞:</strong> ${escapeHtml(item.title)}<br>
-                <strong>使用來源:</strong> ${selectedSources.map(s => escapeHtml(s)).join(', ')}<br>
+                <strong>使用來源:</strong> ${selectedSourceNames.map(s => escapeHtml(s)).join(', ')}<br>
                 <strong>說明:</strong> 系統將${sourceText}改寫為新聞報導
             `;
 
@@ -1480,7 +1486,7 @@
                         title: item.title,
                         url: item.url,
                         normalized_title: item.normalized_title,
-                        sources: selectedSources  // 只傳送選中的來源
+                        sources: selectedSourcesData  // 傳送完整的來源資訊（包含 source, title, url）
                     }),
                 });
 
