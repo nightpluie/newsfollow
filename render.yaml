@@ -11,3 +11,5 @@ services:
         sync: false
       - key: TZ
         value: Asia/Taipei
+      - key: PYTHONUNBUFFERED
+        value: 1

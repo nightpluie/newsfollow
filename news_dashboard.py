@@ -531,9 +531,9 @@ def api_crawl():
     """爬取所有來源（平行執行）"""
     import time
     start_time = time.time()
-    print(f"\n{'='*60}")
-    print(f"🚀 開始分析流程 (時間戳: {time.strftime('%Y-%m-%d %H:%M:%S')})")
-    print(f"{'='*60}")
+    print(f"\n{'='*60}", flush=True)
+    print(f"🚀 開始分析流程 (時間戳: {time.strftime('%Y-%m-%d %H:%M:%S')})", flush=True)
+    print(f"{'='*60}", flush=True)
 
     try:
         # 定義爬取任務
@@ -611,9 +611,9 @@ def api_crawl():
         print(f"📊 LLM 調用統計: {llm_calls} 次")
 
         total_time = time.time() - start_time
-        print(f"\n✅ 分析完成！總耗時: {total_time:.2f} 秒")
-        print(f"   - 找到缺少新聞: {len(missing_news)} 則")
-        print(f"{'='*60}\n")
+        print(f"\n✅ 分析完成！總耗時: {total_time:.2f} 秒", flush=True)
+        print(f"   - 找到缺少新聞: {len(missing_news)} 則", flush=True)
+        print(f"{'='*60}\n", flush=True)
 
         return jsonify({
             'success': True,
