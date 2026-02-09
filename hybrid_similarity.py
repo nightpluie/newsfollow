@@ -17,7 +17,7 @@ except ImportError:
     print("⚠️  未安裝 python-dotenv，請執行: pip install python-dotenv")
 
 from openai import OpenAI
-from main import title_similarity
+from main import title_similarity, TitleFeatures
 
 
 class HybridSimilarityChecker:
@@ -64,8 +64,6 @@ class HybridSimilarityChecker:
                     timeout=httpx.Timeout(self.timeout, connect=5.0)  # 總超時 + 連接超時
                 )
                 print(f"✅ 混合相似度檢查器已啟用 LLM 功能（{model}，timeout={timeout}s）")
-
-    from main import TitleFeatures
 
     def is_same_news(self, title1: Union[str, TitleFeatures], title2: Union[str, TitleFeatures]) -> bool:
         """
