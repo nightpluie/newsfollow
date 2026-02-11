@@ -122,3 +122,28 @@ sources:
           - "a.gt"
           - "h3 a"
           - "a[href*='News.aspx?NewsID=']"
+
+  - source_id: ltn
+    source_name: 自由電子報
+    domain_contains: news.ltn.com.tw
+    sections:
+      - section_id: homepage
+        url: https://news.ltn.com.tw/
+        weight: 6
+        max_items: 25
+        selectors:
+          - "a.swiper-slide"
+          - "a[href*='/news/']"
+          - "a[href*='/breakingnews/']"
+
+  - source_id: ebc
+    source_name: 東森新聞
+    domain_contains: news.ebc.net.tw
+    sections:
+      - section_id: homepage
+        url: https://news.ebc.net.tw/
+        weight: 6
+        max_items: 25
+        selectors:
+          - "a h3"
+          - "a[href*='news.ebc.net.tw']"

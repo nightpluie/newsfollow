@@ -146,23 +146,31 @@
         }
 
         .stat-item:nth-child(1) {
-            border-bottom-color: #2563EB;
+            border-bottom-color: #FF6600;
         }
 
         .stat-item:nth-child(2) {
-            border-bottom-color: #7C3AED;
+            border-bottom-color: #0066CC;
         }
 
         .stat-item:nth-child(3) {
-            border-bottom-color: #D97706;
+            border-bottom-color: #D2232A;
         }
 
         .stat-item:nth-child(4) {
-            border-bottom-color: #059669;
+            border-bottom-color: #003D79;
         }
 
         .stat-item:nth-child(5) {
-            border-bottom-color: #0EA5E9;
+            border-bottom-color: #0080CE;
+        }
+
+        .stat-item:nth-child(6) {
+            border-bottom-color: #E8AD2B;
+        }
+
+        .stat-item:nth-child(7) {
+            border-bottom-color: #C8102E;
         }
 
         .stat-label {
@@ -381,29 +389,46 @@
         }
 
         .source-badge.udn {
-            background: #2563EB;
+            background: #FF6600;
             color: white;
         }
 
         .source-badge.tvbs {
-            background: #7C3AED;
+            background: #0066CC;
             color: white;
         }
 
         .source-badge.chinatimes,
         .source-badge.中時新聞網 {
-            background: #D97706;
+            background: #D2232A;
             color: white;
         }
 
         .source-badge.setn,
         .source-badge.三立新聞網 {
-            background: #059669;
+            background: #003D79;
             color: white;
         }
 
         .source-badge.ettoday {
-            background: #0EA5E9;
+            background: #0080CE;
+            color: white;
+        }
+
+        .source-badge.ltn,
+        .source-badge.自由電子報 {
+            background: #E8AD2B;
+            color: white;
+        }
+
+        .source-badge.nownews {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .source-badge.ebc,
+        .source-badge.東森新聞 {
+            background: #C8102E;
             color: white;
         }
 
@@ -970,6 +995,108 @@
             color: #F97316;
             font-size: 18px;
         }
+
+        /* Source Filter Buttons */
+        .source-filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 20px 28px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #E2E8F0;
+            align-items: center;
+        }
+
+        .filter-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 4px;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid transparent;
+            background: white;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.2s;
+            letter-spacing: 0.3px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        }
+
+        .filter-btn.active {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .filter-btn:not(.active) {
+            background: #F1F5F9;
+            color: #94A3B8;
+            opacity: 0.6;
+            box-shadow: none;
+        }
+
+        .filter-btn.udn.active {
+            background: #FF6600;
+            color: white;
+            border-color: #FF6600;
+        }
+
+        .filter-btn.tvbs.active {
+            background: #0066CC;
+            color: white;
+            border-color: #0066CC;
+        }
+
+        .filter-btn.chinatimes.active {
+            background: #D2232A;
+            color: white;
+            border-color: #D2232A;
+        }
+
+        .filter-btn.setn.active {
+            background: #003D79;
+            color: white;
+            border-color: #003D79;
+        }
+
+        .filter-btn.ettoday.active {
+            background: #0080CE;
+            color: white;
+            border-color: #0080CE;
+        }
+
+        .filter-btn.ltn.active,
+        .filter-btn.自由電子報.active {
+            background: #E8AD2B;
+            color: white;
+            border-color: #E8AD2B;
+        }
+
+        .filter-btn.nownews.active {
+            background: #FF6B35;
+            color: white;
+            border-color: #FF6B35;
+        }
+
+        .filter-btn.ebc.active,
+        .filter-btn.東森新聞.active {
+            background: #C8102E;
+            color: white;
+            border-color: #C8102E;
+        }
+
+        .filter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
     </style>
 </head>
 
@@ -1016,10 +1143,30 @@
                     <div class="stat-label">ETtoday 新聞雲</div>
                     <div class="stat-value" id="ettodayCount">0</div>
                 </div>
+                <div class="stat-item">
+                    <div class="stat-label">自由電子報</div>
+                    <div class="stat-value" id="ltnCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">東森新聞</div>
+                    <div class="stat-value" id="ebcCount">0</div>
+                </div>
             </div>
 
             <!-- Dashboard Section -->
             <div class="content-section active" id="dashboardSection">
+                <!-- 媒體來源過濾器 -->
+                <div class="source-filters" id="sourceFilters" style="display: none;">
+                    <span class="filter-label">顯示來源:</span>
+                    <button class="filter-btn udn active" data-source="UDN" onclick="toggleFilter('UDN')">UDN</button>
+                    <button class="filter-btn tvbs active" data-source="TVBS" onclick="toggleFilter('TVBS')">TVBS</button>
+                    <button class="filter-btn chinatimes active" data-source="中時新聞網" onclick="toggleFilter('中時新聞網')">中時</button>
+                    <button class="filter-btn setn active" data-source="三立新聞網" onclick="toggleFilter('三立新聞網')">三立</button>
+                    <button class="filter-btn ettoday active" data-source="ETtoday" onclick="toggleFilter('ETtoday')">ETtoday</button>
+                    <button class="filter-btn ltn active" data-source="自由電子報" onclick="toggleFilter('自由電子報')">自由</button>
+                    <button class="filter-btn ebc active" data-source="東森新聞" onclick="toggleFilter('東森新聞')">東森</button>
+                </div>
+
                 <!-- 主要區域：ET 缺少的新聞 -->
                 <div class="primary-section" id="missingSection" style="display: none;">
                     <div class="section-header">
@@ -1250,6 +1397,7 @@
             sourceSection.style.display = 'none';
             missingSection.style.display = 'none';
             emptyState.style.display = 'none';
+            document.getElementById('sourceFilters').style.display = 'none';
 
             // 進度模擬
             let progress = 0;
@@ -1347,6 +1495,7 @@
             const sourceSection = document.getElementById('sourceSection');
             const missingSection = document.getElementById('missingSection');
             const emptyState = document.getElementById('emptyState');
+            const sourceFilters = document.getElementById('sourceFilters');
 
             // 更新統計數據
             document.getElementById('udnCount').textContent = (data.udn || []).length;
@@ -1354,8 +1503,11 @@
             document.getElementById('chinatimesCount').textContent = (data['中時新聞網'] || []).length;
             document.getElementById('setnCount').textContent = (data['三立新聞網'] || []).length;
             document.getElementById('ettodayCount').textContent = data.ettoday.length;
+            document.getElementById('ltnCount').textContent = (data['自由電子報'] || []).length;
+            document.getElementById('ebcCount').textContent = (data['東森新聞'] || []).length;
 
             statsBar.style.display = 'flex';
+            sourceFilters.style.display = 'flex';
             emptyState.style.display = 'none';
 
             // 優先顯示缺少的新聞
@@ -1373,6 +1525,9 @@
 
             // 更新分析報告統計
             updateReportsStats(data);
+
+            // 載入用戶過濾偏好
+            loadFilterPreferences();
         }
 
         function displaySourceTable(data) {
@@ -1387,7 +1542,7 @@
             if (data.ettoday) data.ettoday.forEach(item => allNews.push({ ...item, source: 'ETtoday', sourceBadge: 'ettoday' }));
 
             tbody.innerHTML = allNews.map(item => `
-                <tr>
+                <tr data-source="${escapeHtml(item.source)}">
                     <td>
                         <a href="${escapeHtml(item.url)}" target="_blank" class="link-btn" style="color: #1e293b; text-decoration: none; display: block; font-weight: 500;">
                             ${escapeHtml(item.title)}
@@ -1409,6 +1564,9 @@
                 // 只顯示星級評分（不顯示數字分數）
                 const starRating = item.star_rating || '';
 
+                // 收集所有來源名稱
+                const allSources = (item.source_details || []).map(d => d.source).join(',');
+
                 // 建立來源詳細列表（顯示每個來源的標題和連結）
                 const sourcesList = (item.source_details || []).map(detail => {
                     let badgeClass = detail.source.toLowerCase();
@@ -1416,7 +1574,7 @@
                     if (detail.source === '三立新聞網') badgeClass = 'setn';
 
                     return `
-                        <div class="source-detail-item">
+                        <div class="source-detail-item" data-source="${escapeHtml(detail.source)}">
                             <span class="source-badge ${badgeClass}">${escapeHtml(detail.source)}</span>
                             <a href="${escapeHtml(detail.url)}" target="_blank" class="source-title-link">
                                 ${escapeHtml(detail.title)}
@@ -1426,7 +1584,7 @@
                 }).join('');
 
                 return `
-                    <div class="missing-item">
+                    <div class="missing-item" data-sources="${escapeHtml(allSources)}">
                         <div class="missing-header">
                             <div class="missing-title-container">
                                 ${starRating ? `<span class="star-rating">${starRating}</span>` : ''}
@@ -1672,6 +1830,67 @@
                 closeModal();
             }
         });
+
+        // 媒體來源過濾功能
+        function toggleFilter(source) {
+            const btn = document.querySelector(`.filter-btn[data-source="${source}"]`);
+            btn.classList.toggle('active');
+
+            const isActive = btn.classList.contains('active');
+
+            // 1. 顯示/隱藏完整新聞列表中的該來源新聞
+            const rows = document.querySelectorAll(`#sourceTableBody tr[data-source="${source}"]`);
+            rows.forEach(row => {
+                row.style.display = isActive ? '' : 'none';
+            });
+
+            // 2. 顯示/隱藏 ET 缺少新聞中的來源詳細項目
+            const sourceDetailItems = document.querySelectorAll(`.source-detail-item[data-source="${source}"]`);
+            sourceDetailItems.forEach(item => {
+                item.style.display = isActive ? '' : 'none';
+            });
+
+            // 3. 檢查每個 missing-item，如果所有來源都被隱藏，則隱藏整個項目
+            document.querySelectorAll('.missing-item').forEach(missingItem => {
+                const visibleSources = missingItem.querySelectorAll('.source-detail-item:not([style*="display: none"])');
+                missingItem.style.display = visibleSources.length > 0 ? '' : 'none';
+            });
+
+            // 保存用戶偏好到 localStorage
+            saveFilterPreferences();
+        }
+
+        function saveFilterPreferences() {
+            const activeFilters = Array.from(document.querySelectorAll('.filter-btn.active'))
+                .map(btn => btn.dataset.source);
+            localStorage.setItem('newsFilters', JSON.stringify(activeFilters));
+        }
+
+        function loadFilterPreferences() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('newsFilters') || '[]');
+
+                // 如果有保存的偏好，應用它們
+                if (saved.length > 0) {
+                    document.querySelectorAll('.filter-btn').forEach(btn => {
+                        const source = btn.dataset.source;
+                        const shouldBeActive = saved.includes(source);
+
+                        if (shouldBeActive !== btn.classList.contains('active')) {
+                            btn.classList.toggle('active', shouldBeActive);
+
+                            // 更新對應的新聞顯示狀態
+                            const rows = document.querySelectorAll(`#sourceTableBody tr[data-source="${source}"]`);
+                            rows.forEach(row => {
+                                row.style.display = shouldBeActive ? '' : 'none';
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('載入過濾偏好失敗:', e);
+            }
+        }
     </script>
 </body>
 

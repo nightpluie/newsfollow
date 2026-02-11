@@ -27,12 +27,15 @@ class HybridSimilarityChecker:
     策略：
     1. 階段 1：演算法快速過濾
        - 相似度 > 0.6 → 直接判定為相同 ✅
-       - 相似度 < 0.3 → 直接判定為不同 ❌
-       - 0.3 ≤ 相似度 ≤ 0.6 → 進入階段 2
+       - 相似度 < 0.2 → 直接判定為不同 ❌
+       - 0.2 ≤ 相似度 ≤ 0.6 → 進入階段 2
 
     2. 階段 2：LLM 精確判斷
        - 使用 GPT-4o-mini（最便宜）
        - 簡單 prompt：判斷是否為同一事件
+
+    註：閾值從 0.3 降到 0.2，以捕捉「同事件但標題差異大」的案例
+    （例如：「拿掃把的高齡長者」vs「高金素梅」）
     """
 
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4.1-nano-2025-04-14", enable_llm: bool = True, timeout: int = 10):
@@ -79,10 +82,10 @@ class HybridSimilarityChecker:
             return True
 
         # 低相似度：直接判定為不同
-        if algo_similarity < 0.3:
+        if algo_similarity < 0.2:
             return False
 
-        # 中間地帶（0.3-0.6）：使用 LLM 確認
+        # 中間地帶（0.2-0.6）：使用 LLM 確認
         if self.enable_llm and self.client:
             # LLM 需要原始文字
             t1_text = title1.text if isinstance(title1, TitleFeatures) else title1
