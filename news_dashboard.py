@@ -229,11 +229,15 @@ class NewsDashboard:
         # 用於群集的項目列表（儲存 (item, features)）
         missing_items_with_features = []
 
+        # 批次處理以減少記憶體峰值
+        import gc
+        batch_count = 0
+
         for source_name, items in all_source_items.items():
             for item in items:
                 # 預計算候選標題特徵
                 candidate_features = compute_title_features(item.title)
-                
+
                 # 使用混合策略檢查是否在 ETtoday 中存在
                 # 傳遞預計算的特徵物件
                 is_in_ettoday = self.similarity_checker.batch_check(
@@ -245,6 +249,11 @@ class NewsDashboard:
                 if not is_in_ettoday:
                     missing_items.append(item)
                     missing_items_with_features.append((item, candidate_features))
+
+                # 每處理 50 則新聞就回收一次記憶體
+                batch_count += 1
+                if batch_count % 50 == 0:
+                    gc.collect()
 
         # 顯示統計資訊
         stats = self.similarity_checker.get_statistics()
@@ -274,6 +283,12 @@ class NewsDashboard:
         
         # 還原 clusters 為純 NewsItem 列表以便後續處理
         news_clusters = [[pair[0] for pair in cluster] for cluster in clusters]
+
+        # 釋放不再需要的特徵物件
+        del clusters
+        del missing_items_with_features
+        del ettoday_features_list
+        gc.collect()
 
         # 為每個群集建立新聞資訊
         news_by_cluster = []
@@ -578,9 +593,9 @@ def api_crawl():
         def crawl_et():
             return ('ETtoday', dashboard.crawl_ettoday())
 
-        # 平行爬取所有來源（最多 2 個同時執行，減少記憶體壓力）
+        # 平行爬取所有來源（最多 1 個同時執行，避免記憶體不足）
         results = {}
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=1) as executor:
             # 提交所有任務
             futures = [
                 executor.submit(crawl_udn),
