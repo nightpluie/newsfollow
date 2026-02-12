@@ -564,6 +564,11 @@ def api_crawl():
     print(f"🚀 開始分析流程 (時間戳: {time.strftime('%Y-%m-%d %H:%M:%S')})", flush=True)
     print(f"{'='*60}", flush=True)
 
+    # 清除 jieba 分詞快取（釋放記憶體）
+    from main import get_jieba_tokens
+    get_jieba_tokens.cache_clear()
+    print("🧹 已清除 jieba 分詞快取")
+
     try:
         # 定義爬取任務
         def crawl_udn():

@@ -82,17 +82,20 @@ class HybridSimilarityChecker:
             return True
 
         # 低相似度：直接判定為不同
-        if algo_similarity < 0.2:
+        if algo_similarity < 0.3:
             return False
 
-        # 中間地帶（0.2-0.6）：使用 LLM 確認
-        if self.enable_llm and self.client:
+        # 中間地帶（0.3-0.6）：使用 LLM 確認
+        # 安全閥：如果 LLM 調用次數超過 200，回退到演算法判斷
+        if self.enable_llm and self.client and self.llm_call_count < 200:
             # LLM 需要原始文字
             t1_text = title1.text if isinstance(title1, TitleFeatures) else title1
             t2_text = title2.text if isinstance(title2, TitleFeatures) else title2
             return self._llm_check_similarity(t1_text, t2_text)
         else:
-            # 如果 LLM 未啟用，使用保守策略（0.5 閾值）
+            # 如果 LLM 未啟用或超過調用上限，使用保守策略（0.5 閾值）
+            if self.enable_llm and self.llm_call_count >= 200:
+                print(f"⚠️  已達 LLM 調用上限（200 次），後續使用演算法判斷")
             return algo_similarity >= 0.5
 
     def _llm_check_similarity(self, title1: str, title2: str) -> bool:
