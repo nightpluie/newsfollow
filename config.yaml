@@ -30,7 +30,7 @@ sources:
       - section_id: homepage
         url: https://udn.com/news/index
         weight: 5
-        max_items: 15
+        max_items: 25
         selectors:
           - "a.story-list__title-link"
           - ".story-list a"
@@ -38,7 +38,7 @@ sources:
       - section_id: breaknews
         url: https://udn.com/news/index
         weight: 6
-        max_items: 15
+        max_items: 25
         selectors:
           - ".breaking-news a"
           - ".news-bar a"
@@ -46,7 +46,7 @@ sources:
       - section_id: realtime
         url: https://udn.com/news/breaknews/1
         weight: 6
-        max_items: 15
+        max_items: 25
         selectors:
           - "a.story-list__title-link"
           - ".story-list a"
@@ -61,7 +61,7 @@ sources:
       - section_id: homepage
         url: https://news.tvbs.com.tw/
         weight: 5
-        max_items: 15
+        max_items: 25
         selectors:
           - "a.news__title"
           - "a[href*='news.tvbs.com.tw/'][title]"
@@ -69,7 +69,7 @@ sources:
       - section_id: marquee
         url: https://news.tvbs.com.tw/
         weight: 6
-        max_items: 15
+        max_items: 25
         selectors:
           - ".breakingNews a"
           - ".marquee a"
@@ -77,7 +77,7 @@ sources:
       - section_id: hot
         url: https://news.tvbs.com.tw/hot
         weight: 4
-        max_items: 15
+        max_items: 25
         selectors:
           - ".hot a"
           - ".popular a"
@@ -90,14 +90,14 @@ sources:
       - section_id: realtime
         url: https://www.chinatimes.com/realtimenews/?chdtv
         weight: 6
-        max_items: 15
+        max_items: 25
         selectors:
           - "h3 a"
           - ".title a"
       - section_id: homepage_breaking
         url: https://www.chinatimes.com/
         weight: 5
-        max_items: 15
+        max_items: 25
         selectors:
           - "h3 a"
           - ".title a"
@@ -110,31 +110,18 @@ sources:
       - section_id: viewall
         url: https://www.setn.com/ViewAll.aspx
         weight: 6
-        max_items: 15
+        max_items: 25
         selectors:
           - "h3 a"
           - "a[href*='News.aspx?NewsID=']"
       - section_id: homepage
         url: https://www.setn.com/
         weight: 5
-        max_items: 15
+        max_items: 25
         selectors:
           - "a.gt"
           - "h3 a"
           - "a[href*='News.aspx?NewsID=']"
-
-  - source_id: ltn
-    source_name: 自由電子報
-    domain_contains: news.ltn.com.tw
-    sections:
-      - section_id: homepage
-        url: https://news.ltn.com.tw/
-        weight: 6
-        max_items: 15
-        selectors:
-          - "a.swiper-slide"
-          - "a[href*='/news/']"
-          - "a[href*='/breakingnews/']"
 
   - source_id: ebc
     source_name: 東森新聞
@@ -143,7 +130,7 @@ sources:
       - section_id: homepage
         url: https://news.ebc.net.tw/
         weight: 6
-        max_items: 15
+        max_items: 25
         selectors:
           - "a h3"
           - "a[href*='news.ebc.net.tw']"

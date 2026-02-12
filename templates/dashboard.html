@@ -166,10 +166,6 @@
         }
 
         .stat-item:nth-child(6) {
-            border-bottom-color: #E8AD2B;
-        }
-
-        .stat-item:nth-child(7) {
             border-bottom-color: #C8102E;
         }
 
@@ -1144,10 +1140,6 @@
                     <div class="stat-value" id="ettodayCount">0</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-label">自由電子報</div>
-                    <div class="stat-value" id="ltnCount">0</div>
-                </div>
-                <div class="stat-item">
                     <div class="stat-label">東森新聞</div>
                     <div class="stat-value" id="ebcCount">0</div>
                 </div>
@@ -1163,7 +1155,6 @@
                     <button class="filter-btn chinatimes active" data-source="中時新聞網" onclick="toggleFilter('中時新聞網')">中時</button>
                     <button class="filter-btn setn active" data-source="三立新聞網" onclick="toggleFilter('三立新聞網')">三立</button>
                     <button class="filter-btn ettoday active" data-source="ETtoday" onclick="toggleFilter('ETtoday')">ETtoday</button>
-                    <button class="filter-btn ltn active" data-source="自由電子報" onclick="toggleFilter('自由電子報')">自由</button>
                     <button class="filter-btn ebc active" data-source="東森新聞" onclick="toggleFilter('東森新聞')">東森</button>
                 </div>
 
@@ -1503,7 +1494,6 @@
             document.getElementById('chinatimesCount').textContent = (data['中時新聞網'] || []).length;
             document.getElementById('setnCount').textContent = (data['三立新聞網'] || []).length;
             document.getElementById('ettodayCount').textContent = data.ettoday.length;
-            document.getElementById('ltnCount').textContent = (data['自由電子報'] || []).length;
             document.getElementById('ebcCount').textContent = (data['東森新聞'] || []).length;
 
             statsBar.style.display = 'flex';

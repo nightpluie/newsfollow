@@ -582,10 +582,6 @@ def api_crawl():
             config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'setn'), None)
             return ('三立新聞網', dashboard.crawl_source(config) if config else [])
 
-        def crawl_ltn():
-            config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'ltn'), None)
-            return ('自由電子報', dashboard.crawl_source(config) if config else [])
-
         def crawl_ebc():
             config = next((s for s in dashboard.config['sources'] if s['source_id'] == 'ebc'), None)
             return ('東森新聞', dashboard.crawl_source(config) if config else [])
@@ -602,7 +598,6 @@ def api_crawl():
                 executor.submit(crawl_tvbs),
                 executor.submit(crawl_chinatimes),
                 executor.submit(crawl_setn),
-                executor.submit(crawl_ltn),
                 executor.submit(crawl_ebc),
                 executor.submit(crawl_et),
             ]
@@ -621,7 +616,6 @@ def api_crawl():
         tvbs_items = results.get('TVBS', [])
         chinatimes_items = results.get('中時新聞網', [])
         setn_items = results.get('三立新聞網', [])
-        ltn_items = results.get('自由電子報', [])
         ebc_items = results.get('東森新聞', [])
         ettoday_items = results.get('ETtoday', [])
 
@@ -631,7 +625,6 @@ def api_crawl():
             'TVBS': tvbs_items,
             '中時新聞網': chinatimes_items,
             '三立新聞網': setn_items,
-            '自由電子報': ltn_items,
             '東森新聞': ebc_items,
         }
 
@@ -664,7 +657,6 @@ def api_crawl():
             'tvbs': [{'source': i.source, 'title': i.title, 'url': i.url} for i in tvbs_items],
             '中時新聞網': [{'source': i.source, 'title': i.title, 'url': i.url} for i in chinatimes_items],
             '三立新聞網': [{'source': i.source, 'title': i.title, 'url': i.url} for i in setn_items],
-            '自由電子報': [{'source': i.source, 'title': i.title, 'url': i.url} for i in ltn_items],
             '東森新聞': [{'source': i.source, 'title': i.title, 'url': i.url} for i in ebc_items],
             'ettoday': [{'source': i.source, 'title': i.title, 'url': i.url} for i in ettoday_items],
             'missing': missing_news,
